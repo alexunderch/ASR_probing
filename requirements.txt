@@ -6,7 +6,6 @@ datasets==1.18.0
 transformers==4.15.0
 torchaudio==0.9.0
 numpy
-os 
 matplotlib
 pandas
 torch
