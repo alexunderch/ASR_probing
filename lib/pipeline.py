@@ -14,7 +14,7 @@ from .constants import Constants
 
 
 class Probing_pipeline:
-    def __init__(self, writer: torch.utils.tensorboard.SummaryWriter,
+    def __init__(self, writer: torch.utils.tensorboard.SummaryWriter, device: torch.device,
                  feature: str, model_path: str, data: Dataset = None, lang: str = None, split: str = None) -> None:
         """Hugging Face Dataset wrapper for ASR probing
         Args:
@@ -38,6 +38,7 @@ class Probing_pipeline:
         self.feature = feature
         self.model_path = model_path
         self.dataset = data
+        self.device = device
 
     def load_data(self, from_disk: bool, data_path: str = None, own_feature_set: dict = None, only_custom_features: bool = True, **kwargs) -> None:
         """Custom dataloader
@@ -168,7 +169,7 @@ class Probing_pipeline:
                                    defalult = False
            plotting_config, dict ({"title": str, "metrics": list of used in pro bing fn metrics, "save_path": str}), default = None
         """
-        probing_task = probing_taskk(self.model_path, self.writer, data = self.dataset, init_strategy = init_strategy)
+        probing_task = probing_taskk(self.model_path, self.writer, data = self.dataset, init_strategy = init_strategy, device = self.device)
         probing_task.get_resources(load_data = False, batch_size = self.cc.BATCH_SIZE, **kwargs)
        
 
