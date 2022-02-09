@@ -156,7 +156,8 @@ class BertOProber(Prober):
         model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO, 
                         'hidden_size': 100,
                         'out_size': len(torch.unique(self.data['label'])),
-                        'variational': use_variational}
+                        'variational': use_variational,
+                        'device': self.device}
 
         for layer in tqdm(layers, total = len(layers)):
             self.logger.log_string(f"layer {layer} of {len(layers)} in process")     
@@ -316,9 +317,9 @@ class Wav2Vec2Prober(Prober):
             
             model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO, 
                             'hidden_size': 100,
-                            'out_size': len(set(self.data['label'])),
-                            'variational': use_variational}
-            
+                            'out_size': len(torch.unique(self.data['label'])),
+                            'variational': use_variational,
+                            'device': self.device}
 
             for layer in tqdm(layers, total = len(layers)):
                 self.logger.log_string(f"layer {layer} of {len(layers)} in process")     
