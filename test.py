@@ -21,6 +21,7 @@ class TaskTester:
                        prefix_data_path: str = None,
                        model_init_strategies: list = [None] + ["full"], 
                        use_variational: bool = False,
+                       device: torch.device = torch.device('cpu'), 
                        preprocessing_fn: Callable = prepare_probing_task,
                        probing_fn: torch.nn.Module = ProberModel,
                        enable_grads = False,
@@ -79,7 +80,7 @@ class TaskTester:
                     title = dataset_name + "_" + _lang(lang) + "_" + feature + "_task_random=" + str(init_strategy) +\
                             "_grads="  +str(enable_grads) + "_variational=" + str(use_variational) + "_poisoned=" + str(poisoning_ratio)
                     writer = tensorboard.SummaryWriter(os.path.join(cc.LOGGING_DIR, title, "layers={}-{}".format(layers[0], layers[-1])))
-                    pipe = Probing_pipeline(writer = writer,
+                    pipe = Probing_pipeline(writer = writer, device = device,
                                             feature = feature, model_path = cc.MODELS_PATH[dataset_name][str(lang)], 
                                             lang = lang, split = dataset_split)
                     pipe.disable_cache()
