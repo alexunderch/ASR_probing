@@ -1,5 +1,5 @@
-from func_utils import NumpyEncoder, print_if_debug
-from probers import Prober
+from .func_utils import NumpyEncoder, print_if_debug
+from .probers import Prober
 import torch
 from datasets import load_dataset, load_from_disk
 from transformers import Wav2Vec2Processor, logging as log_models
@@ -9,8 +9,8 @@ import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from constants import Constants
 from collections import Callable
+from .constants import Constants
 
 
 class Probing_pipeline:

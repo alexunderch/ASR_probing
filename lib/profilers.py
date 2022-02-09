@@ -7,7 +7,7 @@ import json
 import numpy as np
 from datetime import datetime
 
-from constants import Constants
+from .constants import Constants
 
 class DummyClass:
     def __init__(self, *args, **kwargs): pass

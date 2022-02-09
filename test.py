@@ -1,14 +1,15 @@
 from collections import Callable
 import os
 import torch
+from torch.utils import tensorboard
+
+from lib.constants import Constants
 from lib.func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2, _lang
 from lib.clf import ProberModel
 from lib.probers import Prober, BertOProber, Wav2Vec2Prober
 from lib.constants import Constants
 from lib.pipeline import Probing_pipeline
-from torch.utils.tensorboard import SummaryWriter
-from IPython.utils import clear_output
-
+from IPython.display import clear_output
 class TaskTester:
     def __init__(self, model2probe: Prober,
                        dataset_name: str,
@@ -77,7 +78,7 @@ class TaskTester:
                 for init_strategy in model_init_strategies:
                     title = dataset_name + "_" + _lang(lang) + "_" + feature + "_task_random=" + str(init_strategy) +\
                             "_grads="  +str(enable_grads) + "_variational=" + str(use_variational) + "_poisoned=" + str(poisoning_ratio)
-                    writer = SummaryWriter(os.path.join(cc.LOGGING_DIR, title, "layers={}-{}".format(layers[0], layers[-1])))
+                    writer = tensorboard.SummaryWriter(os.path.join(cc.LOGGING_DIR, title, "layers={}-{}".format(layers[0], layers[-1])))
                     pipe = Probing_pipeline(writer = writer,
                                             feature = feature, model_path = cc.MODELS_PATH[dataset_name][str(lang)], 
                                             lang = lang, split = dataset_split)
@@ -115,29 +116,31 @@ class TaskTester:
     def __repr__(self): return "ez4ence"
 
 def main():
+    
     layers = [1, 2, 3, 4, 7, 8, 9, 12, 15, 18]
-    TaskTester(dataset_name = "timit_asr",
-           model2probe = Wav2Vec2Prober,
-           features = ['sex', 'age_bin'],
-           layers = layers,
-           preprocessing_fn = prepare_probing_task_timit_2,
-           use_variational = True,
-           enable_grads = False,
-           probing_fn = ProberModel,
-           save_checkpoints = False,
-           poisoning_ratio = 0,
-           drop_columns = ['word_detail', 'phonetic_detail'])
+    print(layers)
+    # TaskTester(dataset_name = "timit_asr",
+    #        model2probe = Wav2Vec2Prober,
+    #        features = ['sex', 'age_bin'],
+    #        layers = layers,
+    #        preprocessing_fn = prepare_probing_task_timit_2,
+    #        use_variational = True,
+    #        enable_grads = False,
+    #        probing_fn = ProberModel,
+    #        save_checkpoints = False,
+    #        poisoning_ratio = 0,
+    #        drop_columns = ['word_detail', 'phonetic_detail'])
 
-    TaskTester(dataset_name = "bert",
-           model2probe = BertOProber,
-           features = ['tense'],
-           layers = layers,
-           prefix_data_path='./tense_set/',
-           preprocessing_fn = None,
-           use_variational = True,
-           enable_grads = True,
-           save_checkpoints = False,
-           probing_fn = ProberModel,
-           from_disk=True)
+    # TaskTester(dataset_name = "bert",
+    #        model2probe = BertOProber,
+    #        features = ['tense'],
+    #        layers = layers,
+    #        prefix_data_path='./tense_set/',
+    #        preprocessing_fn = None,
+    #        use_variational = True,
+    #        enable_grads = True,
+    #        save_checkpoints = False,
+    #        probing_fn = ProberModel,
+    #        from_disk=True)
 
 if __name__ == "__main__": main()

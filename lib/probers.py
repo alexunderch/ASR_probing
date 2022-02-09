@@ -2,11 +2,11 @@ import torch
 from transformers import Wav2Vec2ForCTC, BertModel
 from datasets import load_from_disk
 from datasets import Dataset, DatasetDict
-from profilers import CheckPointer, ProbingProfiler, MyLogger
-from func_utils import print_if_debug
-from constants import Constants
+from .profilers import CheckPointer, ProbingProfiler, MyLogger
+from .func_utils import print_if_debug
+from .constants import Constants
 
-from clf import LinearModel, Loss
+from .clf import LinearModel, Loss
 from sklearn.metrics import f1_score
 
 import os

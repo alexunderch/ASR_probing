@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from  IPython.display import clear_output
 
 import json
-from constants import Constants
+from .constants import Constants
 from sklearn.linear_model import SGDClassifier, LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, accuracy_score, classification_report
@@ -54,7 +54,7 @@ def prepare_probing_task_timit(batch, feature_column: str):
     batch['len_speech'] = len(batch['speech'])
     return batch
 
-metadata = pd.read_csv(cc.TIMIT_METADATA_PATH)
+# metadata = pd.read_csv(cc.TIMIT_METADATA_PATH)
 def prepare_probing_task_timit_2(batch, feature_column: str):
     """ Adding new features from  dataset's metadata files
     """

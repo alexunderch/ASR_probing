@@ -1,4 +1,4 @@
-from constants import Constants
+from .constants import Constants
 import torch
 from torch import nn
 def kl_divergence(z, mu_theta, p_theta):
