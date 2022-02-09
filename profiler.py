@@ -1,6 +1,9 @@
 import psutil
 import GPUtil as GPU
 import torch
+import logging
+from constants import DEBUG
+
 class DummyClass:
     def __init__(self, *args, **kwargs): pass
     def __call__(self, *args, **kwargs): pass
@@ -46,3 +49,17 @@ class ProbingProfiler:
                                            profile_memory = True,
                                            with_stack = True)
         return self.prof if self._on else DummyClass()
+
+class MyLogger(object):
+def __init__(self, filepath: str):
+    self.fpath = filepath
+    self.logger = logging.getLogger('my_logger')
+    self.logger.setLevel(logging.INFO if not DEBUG else logging.DEBUG)
+    fh = logging.FileHandler(filepath)
+    fh.setLevel(logging.DEBUG if DEBUG else logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    self.logger.addHandler(fh)
+def log_string(self, message: str):
+    assert isinstance(message, str)
+    self.logger.info(message) 
