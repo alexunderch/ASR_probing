@@ -54,7 +54,7 @@ def prepare_probing_task_timit(batch, feature_column: str):
     batch['len_speech'] = len(batch['speech'])
     return batch
 
-# metadata = pd.read_csv(cc.TIMIT_METADATA_PATH)
+metadata = pd.read_csv(cc.TIMIT_METADATA_PATH)
 def prepare_probing_task_timit_2(batch, feature_column: str):
     """ Adding new features from  dataset's metadata files
     """

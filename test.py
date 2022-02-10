@@ -104,7 +104,7 @@ class TaskTester:
                     pipe.cleanup()
                     if return_results: self.results.append(res)
         if not cc.DEBUG: clear_output(wait = True) 
-        os.system("rm /root/.cache/huggingface/* -r")
+        # os.system("rm /root/.cache/huggingface/* -r")
         os.system("rm ./cache/ -r")
     def get_testing_results(self):
         """ A format:
@@ -120,28 +120,17 @@ def main():
     
     layers = [1, 2, 3, 4, 7, 8, 9, 12, 15, 18]
     print(layers)
-    # TaskTester(dataset_name = "timit_asr",
-    #        model2probe = Wav2Vec2Prober,
-    #        features = ['sex', 'age_bin'],
-    #        layers = layers,
-    #        preprocessing_fn = prepare_probing_task_timit_2,
-    #        use_variational = True,
-    #        enable_grads = False,
-    #        probing_fn = ProberModel,
-    #        save_checkpoints = False,
-    #        poisoning_ratio = 0,
-    #        drop_columns = ['word_detail', 'phonetic_detail'])
-
-    # TaskTester(dataset_name = "bert",
-    #        model2probe = BertOProber,
-    #        features = ['tense'],
-    #        layers = layers,
-    #        prefix_data_path='./tense_set/',
-    #        preprocessing_fn = None,
-    #        use_variational = True,
-    #        enable_grads = True,
-    #        save_checkpoints = False,
-    #        probing_fn = ProberModel,
-    #        from_disk=True)
+    TaskTester(dataset_name = "timit_asr",
+           model2probe = Wav2Vec2Prober,
+           features = ['sex', 'age_bin'],
+           layers = layers,
+           preprocessing_fn = prepare_probing_task_timit_2,
+           use_variational = True,
+           enable_grads = False,
+           device = torch.device('cuda'),
+           probing_fn = ProberModel,
+           save_checkpoints = False,
+           poisoning_ratio = 0,
+           drop_columns = ['word_detail', 'phonetic_detail'])
 
 if __name__ == "__main__": main()
