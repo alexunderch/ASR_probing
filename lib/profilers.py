@@ -18,7 +18,7 @@ class DummyClass:
 
 class ProbingProfiler:
     def __init__(self, log_dir: str): 
-        assert isinstance(log_dir, str) and log_dir.endswith("/")
+        assert isinstance(log_dir, str) 
         self.log_dir = log_dir
         self.prof = None
         self.rep = ""
@@ -85,7 +85,7 @@ class CheckPointer:
         -> saving: full model, layer index, optimizer state dict 
         """
         cc = Constants
-        assert isinstance(parent_dir, str) and parent_dir.endswith("/")
+        assert isinstance(parent_dir, str)
         self.parent_dir = os.path.join(parent_dir, "checkpoints", str(cc.TODAY))
 
     def __call__(self, probing_model: torch.nn.Module, task_title: str,

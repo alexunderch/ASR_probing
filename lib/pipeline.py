@@ -12,6 +12,11 @@ import matplotlib.pyplot as plt
 from collections import Callable
 from .constants import Constants
 
+def _make_directory_structure():
+    cc =Constants
+    if not os.path.exists(cc.GRAPHS_PATH): os.makedirs(os.path.join(cc.GRAPHS_PATH, cc.TODAY))
+    if not os.path.exists(cc.LOGGING_DIR): os.makedirs(cc.LOGGING_DIR)
+    if not os.path.exists(cc.PROFILING_DIR) and cc.PROFILING: os.makedirs(cc.PROFILING_DIR)
 
 class Probing_pipeline:
     def __init__(self, writer: torch.utils.tensorboard.SummaryWriter, device: torch.device,
@@ -39,6 +44,7 @@ class Probing_pipeline:
         self.model_path = model_path
         self.dataset = data
         self.device = device
+    
 
     def load_data(self, from_disk: bool, data_path: str = None, own_feature_set: dict = None, only_custom_features: bool = True, **kwargs) -> None:
         """Custom dataloader
@@ -53,6 +59,7 @@ class Probing_pipeline:
                                       active only with own_feature_set, default = True
         """
         print_if_debug("loading data...", self.cc.DEBUG)
+
         if from_disk:
             assert isinstance(data_path, str) 
             self.dataset =  load_from_disk(data_path, **kwargs)

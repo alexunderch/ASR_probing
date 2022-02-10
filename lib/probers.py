@@ -202,7 +202,7 @@ class BertOProber(Prober):
                 chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
                                             task_title = "" if task_title is None else task_title,
                                             params = model_config, layer_idx = layer, optimizer = optim)
-                print_if_debug("checpoint {} saved...".format(chkpnt), self.cc.DEBUG)
+                print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
             
             self._clear_cache()
 
@@ -233,7 +233,7 @@ class BertOProber(Prober):
             probing_model = probing_model.cpu()
             del optim
             del probing_model
-            self.logger.log_string(self.profiler.monitor_resources() + "\n")
+            self.logger.log_string(self.profiler.rep + "\n")
 
         print_if_debug('running probes...', self.cc.DEBUG)
         return probing_info
@@ -364,7 +364,7 @@ class Wav2Vec2Prober(Prober):
                     chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
                                                task_title = "" if task_title is None else task_title,
                                                params = model_config, layer_idx = layer, optimizer = optim)
-                    print_if_debug("checpoint {} saved...".format(chkpnt), self.cc.DEBUG)
+                    print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
                 
                 self._clear_cache()
 
@@ -396,7 +396,7 @@ class Wav2Vec2Prober(Prober):
                 probing_model = probing_model.cpu()
                 del optim
                 del probing_model
-                self.logger.log_string(self.profiler.monitor_resources() + "\n")
+                self.logger.log_string(self.profiler.rep + "\n")
 
         print_if_debug('running probes...', self.cc.DEBUG)
         return probing_info

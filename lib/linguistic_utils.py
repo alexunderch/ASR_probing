@@ -1,5 +1,5 @@
-from constants import Constants
-from func_utils import print_if_debug, label_batch
+from .constants import Constants
+from .func_utils import print_if_debug, label_batch
 
 from torchaudio import load, transforms
 from datasets import load_dataset, load_from_disk
@@ -9,6 +9,7 @@ from collections import Callable
 import json
 import pandas as pd
 import numpy as np
+from typing import Any
 
 modes = ['word_detail', 'phonetic_detail']
 class LinguisticDataset:
@@ -97,6 +98,11 @@ class BertProbingDataset:
         self.feature_column = feature_column
         self.tokenizer = BertTokenizer.from_pretrained(Constants.MODELS_PATH[model_path]["None"])
         self.maxlen = 0 
+
+    def loadHuggingFaceDataset(self):
+        self.task_data = load_from_disk(dataset_path = self.fpath)
+
+
     def loadFile(self):
         import io
         self.task_data = {'train': {'data': [], self.feature_column: []},
@@ -120,9 +126,11 @@ class BertProbingDataset:
             for i, y in enumerate(self.task_data[split][self.feature_column]):
                 self.task_data[split][self.feature_column][i] = self.tok2label[y]
     
-    def make_dataset(self, from_disk = False, data_col: str = 'data'):
+    def make_dataset(self, from_disk = False, data_col: str = 'data') -> Any[Dataset, DatasetDict]:
         ###TODO: ADD SUPPORT OF OTHER DATASET TYPES, DOCSTRINGS
-        self.loadFile()
+        if from_disk: self.loadHuggingFaceDataset()
+        else: self.loadFile()
+
         def mapping_fn(batch, maxlen: int, data_col: str = 'data'):
             """BERT preprocessing
             """
@@ -132,10 +140,13 @@ class BertProbingDataset:
             batch['attention_mask'] = inputs.attention_mask
             batch['label'] = int(batch[self.feature_column])
             return batch
-        dataset = DatasetDict()
-        for k, v in self.task_data.items(): 
-            dataset[k] = Dataset.from_dict(v)
-            dataset[k] = dataset[k].map(mapping_fn, fn_kwargs = {'maxlen': self.maxlen, 'data_col': data_col} )
+        if load_from_disk:
+            dataset = self.task_data.map(mapping_fn, fn_kwargs = {'maxlen': 20, 'data_col': data_col})
+        else:
+            dataset = DatasetDict()
+            for k, v in self.task_data.items(): 
+                dataset[k] = Dataset.from_dict(v)
+                dataset[k] = dataset[k].map(mapping_fn, fn_kwargs = {'maxlen': self.maxlen, 'data_col': data_col} )
         dataset.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
         dataset.save_to_disk(self.dname)
         return dataset

@@ -14,6 +14,7 @@ from sklearn.metrics import f1_score, accuracy_score, classification_report
 
 _lang = lambda l: "en" if l is None else l
 print_if_debug = lambda x, flag: print(x) if flag else None
+f_set = lambda col: {v: k for k, v in enumerate(list(set(col)))}
 
 cc= Constants
 class NumpyEncoder(json.JSONEncoder):

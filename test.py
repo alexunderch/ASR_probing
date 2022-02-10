@@ -1,4 +1,5 @@
 from collections import Callable
+import imp
 import os
 import torch
 from torch.utils import tensorboard
@@ -8,7 +9,7 @@ from lib.func_utils import prepare_probing_task, prepare_probing_task_timit, pre
 from lib.clf import ProberModel
 from lib.probers import Prober, BertOProber, Wav2Vec2Prober
 from lib.constants import Constants
-from lib.pipeline import Probing_pipeline
+from lib.pipeline import Probing_pipeline, _make_directory_structure
 from IPython.display import clear_output
 class TaskTester:
     def __init__(self, model2probe: Prober,
@@ -74,6 +75,7 @@ class TaskTester:
         self.results = []
         layers = list(sorted(layers))
         cc = Constants
+        _ = _make_directory_structure()
         for lang in dataset_language:
             for feature in features:
                 for init_strategy in model_init_strategies:
@@ -98,7 +100,7 @@ class TaskTester:
                                            init_strategy = init_strategy, 
                                            plotting_config = {"title": title,
                                                               "custom_features": list(own_feature_set.keys()) if own_feature_set is not None else "None",
-                                                              "metrics": ['f1'], 'save_path': cc.GRAPHS_PATH + str(cc.TODAY)},
+                                                              "metrics": ['f1'], 'save_path': os.path.join(cc.GRAPHS_PATH, str(cc.TODAY))},
                                           poisoning_ratio = poisoning_ratio,
                                           poisoning_mapping = poisoning_mapping)
                     pipe.cleanup()
@@ -117,20 +119,30 @@ class TaskTester:
     def __repr__(self): return "ez4ence"
 
 def main():
-    
-    layers = [1, 2, 3, 4, 7, 8, 9, 12, 15, 18]
-    print(layers)
-    TaskTester(dataset_name = "timit_asr",
-           model2probe = Wav2Vec2Prober,
-           features = ['sex', 'age_bin'],
-           layers = layers,
-           preprocessing_fn = prepare_probing_task_timit_2,
-           use_variational = True,
-           enable_grads = False,
-           device = torch.device('cuda'),
-           probing_fn = ProberModel,
-           save_checkpoints = False,
-           poisoning_ratio = 0,
-           drop_columns = ['word_detail', 'phonetic_detail'])
+    import numpy as np
+    layers = list(np.arange(1, 24, 1))
+    TaskTester(dataset_name = "bert",
+            model2probe = BertOProber,
+            features = ['tense'],
+            layers = layers,
+            prefix_data_path='./tense_set/',
+            preprocessing_fn = None,
+            use_variational = False,
+            enable_grads = False,
+            save_checkpoints = False,
+            probing_fn = ProberModel,
+            from_disk=True)
+
+    TaskTester(dataset_name = "bert",
+            model2probe = BertOProber,
+            features = ['tense'],
+            layers = layers,
+            prefix_data_path='./tense_set/',
+            preprocessing_fn = None,
+            use_variational = True,
+            enable_grads = False,
+            save_checkpoints = False,
+            probing_fn = ProberModel,
+            from_disk=True)
 
 if __name__ == "__main__": main()
