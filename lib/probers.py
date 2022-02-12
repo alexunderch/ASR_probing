@@ -1,5 +1,7 @@
+from ast import Str
+from typing import Optional, Dict, Any
 import torch
-from transformers import Wav2Vec2ForCTC, BertModel
+from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration
 from datasets import load_from_disk
 from datasets import Dataset, DatasetDict
 from .profilers import CheckPointer, ProbingProfiler, MyLogger
@@ -123,7 +125,7 @@ class Prober:
         raise NotImplementedError("")
 
 class BertOProber(Prober):
-    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+    def __init__(self, model_path: Any[Str, Dict], writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
         super().__init__(BertModel, model_path, writer, data, device, init_strategy)
         if init_strategy is not None:
             print_if_debug("reseting network parameters...", self.cc.DEBUG)
@@ -333,6 +335,7 @@ class Wav2Vec2Prober(Prober):
                                        clf = LinearModel(**model_config),
                                        enable_grads = enable_grads
                                        ).to(self.device)
+                                       
                 optim = torch.optim.Adam(probing_model.parameters(), lr = 3. * 1e-3)
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max = 10)
                 probing_model.eval()
@@ -397,6 +400,154 @@ class Wav2Vec2Prober(Prober):
                 del optim
                 del probing_model
                 self.logger.log_string(self.profiler.rep + "\n")
+
+        print_if_debug('running probes...', self.cc.DEBUG)
+        return probing_info
+
+class T5Prober(Prober):
+    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+        """ Probing tasks class.
+        Args:
+            model_path, str: path to model in Hugging Face repo
+            data, Dataset: optional, Hugging Face Dataset class 
+                           default = None
+            device: torch.device, accelerator
+            init_strategy: str, flag (use randomly initialized model or downloaded from repo)
+                             supported strategies: 
+                                -- full 
+                                -- (only) encoder
+                                -- (only) feature_extractors
+                                default = None
+            init_func, callable: a function which has args: a model and a strategy and returns None
+        """
+
+        super().__init__(T5ForConditionalGeneration, model_path, writer, data, device, init_strategy)
+        self.model.config.is_decoder = False
+
+        if init_strategy is not None:
+            print_if_debug("reseting network parameters...", self.cc.DEBUG)
+            assert isinstance(init_strategy, str)
+            if init_strategy == "full": self.model.encoder.init_weights()
+            else: print("No init with {} strategy".format(init_strategy))
+        #debugging tools
+        self.writer = writer
+        self.data = data
+        self.device = device
+
+    def make_hidden_states(self, example) -> list:
+        with torch.no_grad(): 
+            output = self.model(example[0].to(self.device), 
+                            attention_mask = example[1].to(self.device),
+                            output_hidden_states = True,
+                            output_attentions = True,
+                            return_dict = True)
+        return [hs.cpu().view((len(hs), -1)).numpy() for hs in output.hidden_states]
+        
+
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: str = None) -> dict:
+        self.fixed_encoder = self.model.encoder.block.cpu()
+        self.model.lm_head = torch.nn.Identity(512)
+
+        assert np.alltrue([l > 0 and l < len(self.fixed_encoder) for l in layers])
+
+        def _prepare_data(batch):
+            """Helper function
+            """
+            labels = batch['label'].to(self.device)
+            inp_values, att_masks =  batch['input_values'][0].to(self.device), batch['attention_mask'][0].to(self.device)
+            return inp_values, att_masks, labels
+
+
+        print_if_debug("stacking classifiers...", self.cc.DEBUG)
+
+        loss_fn = Loss(use_variational)
+
+        probing_info = {'loss': [], 'metrics': []}
+
+        inputs, attention_masks, _ = _prepare_data(iter(self.dataloader).next())
+
+        
+        model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO, 
+                        'hidden_size': 100,
+                        'out_size': len(torch.unique(self.data['label'])),
+                        'variational': use_variational,
+                        'device': self.device}
+
+        for layer in tqdm(layers, total = len(layers)):
+            self.logger.log_string(f"layer {layer} of {len(layers)} in process")     
+
+            self.model.encoder.block = deepcopy(torch.nn.ModuleList(self.fixed_encoder[:layer]).to(self.device))       
+            if enable_grads:
+                for module in list(self.model.encoder.block)[:-1]:
+                    for param in module.parameters(): param.requires_grad = False
+
+            probing_model = prober(parent_model = self.model,
+                                    clf = LinearModel(**model_config),
+                                    enable_grads = enable_grads
+                                    ).to(self.device)
+            optim = torch.optim.Adam(probing_model.parameters(), lr = 3. * 1e-3)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max = 10)
+            probing_model.eval()
+            self.writer.add_graph(probing_model, input_to_model = [inputs, attention_masks])
+            self.logger.log_string(f"training...")
+            
+            probing_model.train()
+            with self.profiler.profile('train') as prof:
+                for epoch in range(self.cc.N_EPOCHS):
+                    self.logger.log_string(f"{epoch} out of {self.cc.N_EPOCHS}")
+                    train_loss = []
+                    for step, batch in tqdm(enumerate(self.dataloader), total = len(self.dataloader)):
+                        inputs, attention_masks, labels = _prepare_data(batch)
+                        optim.zero_grad()
+
+                        logits = probing_model(inputs, attention_masks)
+                        loss = loss_fn(labels, logits, probing_model.clf)
+                        train_loss.append(loss.cpu().item()) 
+
+                        loss.backward()
+                        optim.step()
+                        prof.step()
+                        self._clear_cache()
+                    self.writer.add_scalar("training loss of layer {}".format(layer), np.mean(train_loss), epoch * len(self.dataloader))
+                    scheduler.step()    
+            print_if_debug("validating...", self.cc.DEBUG)
+
+            if save_outputs:
+                chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
+                                            task_title = "" if task_title is None else task_title,
+                                            params = model_config, layer_idx = layer, optimizer = optim)
+                print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
+            
+            self._clear_cache()
+
+            probing_model = probing_model.to(self.device)
+
+            metrics_per_layer, losses_per_layer = [], [] 
+            probing_model.eval()
+            self.logger.log_string(f"validating...")
+
+            with self.profiler.profile('validation') as prof:
+                for step, batch in tqdm(enumerate(self.validloader), total = len(self.validloader)):
+                    inputs, attention_masks, labels = _prepare_data(batch)
+                    with torch.no_grad(): 
+                        logits = probing_model(inputs, attention_masks)
+                    loss = loss_fn(labels, logits, probing_model.clf)
+                    f1 = f1_score(torch.argmax(logits.detach().cpu(), dim = -1).numpy(), labels.detach().cpu().numpy(), average = 'weighted')
+                    metrics_per_layer.append(f1)
+                    losses_per_layer.append(loss.cpu().item())
+                    prof.step()
+                    self._clear_cache()
+                        
+            probing_info['loss'].append(np.mean(losses_per_layer))
+            probing_info['metrics'].append(np.mean(metrics_per_layer))
+
+            self.writer.add_scalar("test loss", np.mean(losses_per_layer), layer)
+            self.writer.add_scalar("test f1", np.mean(metrics_per_layer), layer)    
+
+            probing_model = probing_model.cpu()
+            del optim
+            del probing_model
+            self.logger.log_string(self.profiler.rep + "\n")
 
         print_if_debug('running probes...', self.cc.DEBUG)
         return probing_info

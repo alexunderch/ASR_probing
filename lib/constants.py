@@ -3,7 +3,7 @@ import os
 class Constants:
     TODAY = str(datetime.now().strftime('%Y-%m-%d')) 
     POOLING_TO = 4
-    BATCH_SIZE = 50
+    BATCH_SIZE = 45
     N_EPOCHS = 10
     MAX_LEN = 13000 #for linguistic dataset
     DEBUG = False 

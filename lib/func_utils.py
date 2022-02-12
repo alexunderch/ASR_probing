@@ -16,7 +16,7 @@ _lang = lambda l: "en" if l is None else l
 print_if_debug = lambda x, flag: print(x) if flag else None
 f_set = lambda col: {v: k for k, v in enumerate(list(set(col)))}
 
-cc= Constants
+cc = Constants
 class NumpyEncoder(json.JSONEncoder):
     """ Special json encoder for numpy types """
     def default(self, obj):

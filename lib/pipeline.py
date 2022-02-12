@@ -99,7 +99,7 @@ class Probing_pipeline:
         """All labels """
         return self.f_set
 
-    def preprocess_data(self, preprocessinf_fn: Callable, save_path: str = None, drop_columns: list = None, target_processing: Callable = None):
+    def preprocess_data(self, preprocessig_fn: Callable, feature_processing_fn: Callable, save_path: str = None, drop_columns: list = None, target_processing: Callable = None):
         """
         Args:
             preprocessinf_fn, callable object: prerpocessing dataset function to load all audio, should return the same self.dataset
@@ -112,30 +112,23 @@ class Probing_pipeline:
                                                 default = None
         """
         print_if_debug("downloading necessary staff...", self.cc.DEBUG)
-        processor =  Wav2Vec2Processor.from_pretrained(self.model_path, cache_dir = self.cc.CACHE_DIR)
         def encode_labels(example, feature_column: str):
             """Label Encoder
             """
             example["label"] = self.f_set[example[feature_column]]
             return example
 
-        def add_new_features(batch, max_len: int):
-            """Preprocessing audio features with padding to maximum lenght"""
-            inputs = processor(batch["speech"], sampling_rate = batch["sampling_rate"], return_tensors = "pt", 
-                               padding = 'max_length', truncation = 'max_length', max_length = max_len)
-            batch['input_values'] = inputs.input_values
-            batch['attention_mask'] = inputs.attention_mask
-            return batch
-
         print_if_debug('reading files...', self.cc.DEBUG)
-        if preprocessinf_fn is not None:
-            self.dataset = self.dataset.map(preprocessinf_fn, fn_kwargs = {'feature_column': self.feature}, disable_nullable = False)
+        if preprocessig_fn is not None:
+            self.dataset = self.dataset.map(preprocessig_fn, fn_kwargs = {'feature_column': self.feature}, disable_nullable = False)
         print_if_debug('encoding features...', self.cc.DEBUG)
         self._filter_data(self.own_feature_set, self.only_custom_features)
         self.dataset = self.dataset.map(encode_labels, fn_kwargs = {'feature_column': self.feature})
 
         print_if_debug('processing features...', self.cc.DEBUG)
-        self.dataset = self.dataset.map(add_new_features, fn_kwargs = {'max_len': np.max(self.dataset['len_speech'])})
+        if feature_processing_fn is not None:
+            self.dataset = self.dataset.map(feature_processing_fn, fn_kwargs = {'feature_column': self.feature, 
+                                                                                'max_len': np.max(self.dataset['len_speech'])})
 
         if drop_columns is not None:
             print_if_debug('removing user-picked columns...', self.cc.DEBUG)
@@ -157,12 +150,12 @@ class Probing_pipeline:
             assert isinstance(save_path, str) 
             print_if_debug('saving files...', self.cc.DEBUG)
             if self.lang is None: self.lang = "en"
-            self.dataset.save_to_disk(save_path + self.feature + "_" + self.lang + "_dataset")
+            self.dataset.save_to_disk(os.path.join(save_path, self.feature + "_" + self.lang + "_dataset"))
         print('done')
         return self
     
     def run_probing(self, probing_taskk: Prober, probing_fn, layers: list, enable_grads = False, use_variational: bool = False, init_strategy: str = None, plotting_fn: Callable = None, 
-                    save_checkpoints: bool = False, plotting_config: dict = None, **kwargs):
+                    save_checkpoints: bool = False, plotting_config: dict = None, **kwargs) -> dict:
         """Main probing runner
         Args:
            probing_fn, init_strategy -- look at Prober docs

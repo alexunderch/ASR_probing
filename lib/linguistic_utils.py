@@ -9,7 +9,7 @@ from collections import Callable
 import json
 import pandas as pd
 import numpy as np
-from typing import Any
+from typing import Any, Optional
 
 modes = ['word_detail', 'phonetic_detail']
 class LinguisticDataset:
@@ -91,13 +91,76 @@ class LinguisticDataset:
             new_dataset = new_dataset.map(additional_preprocessing, batched = False)
         return new_dataset
 
-class BertProbingDataset:
-    def __init__(self, model_path: str, filepath: str, dataset_name: str, feature_column: str):
+
+
+# def add_new_features(batch, max_len: int, **kwargs):
+#         processor =  Wav2Vec2Processor.from_pretrained(self.model_path, cache_dir = self.cc.CACHE_DIR)
+
+#         """Preprocessing audio features with padding to maximum lenght"""
+#         inputs = processor(batch["speech"], sampling_rate = batch["sampling_rate"], return_tensors = "pt", 
+#                             padding = 'max_length', truncation = 'max_length', max_length = max_len)
+#         batch['input_values'] = inputs.input_values
+#         batch['attention_mask'] = inputs.attention_mask
+#         return batch
+
+
+
+def load_files(dataset, path=None):
+    senteval = ['subj_number', 'top_const', 'tree_depth']
+    if dataset in senteval:
+        data = pd.read_csv(path, sep='\t', header=None)
+        TRAIN = data[data[0] == 'tr']
+        TEST = data[data[0] == 'te']
+        X_train = TRAIN[2]
+        X_test = TEST[2]
+        y_train = TRAIN[1].values
+        y_test = TEST[1].values
+    elif dataset == 'person':
+        data = pd.read_csv(path, sep='\t')
+        TRAIN = data[data['subset']=='tr']
+        TEST = data[data['subset']=='te']
+        X_train = TRAIN['text']
+        X_test = TEST['text']
+        y_train = TRAIN['label'].values
+        y_test = TEST['label'].values
+    elif dataset == 'conn':
+        TRAIN = pd.read_csv('Conn_train.tsv', sep='\t')
+        TEST = pd.read_csv('Conn_test.tsv', sep='\t')
+        X_train = TRAIN[['sentence_1', 'sentence_2']].values.tolist()
+        X_test = TEST[['sentence_1', 'sentence_2']].values.tolist()
+        y_train = TRAIN['marker'].values
+        y_test = TEST['marker'].values
+    elif dataset == 'DC':
+        TRAIN = pd.read_csv('DC_train.csv')
+        TEST = pd.read_csv('DC_test.csv')
+        X_train = TRAIN['sentence'].apply(eval)
+        X_test = TEST['sentence'].apply(eval)
+        y_train = TRAIN['label'].values
+        y_test = TEST['label'].values
+    elif dataset == 'PDTB':
+        TRAIN = pd.read_csv('Conn_train.tsv', sep='\t')
+        TEST = pd.read_csv('Conn_test.tsv', sep='\t')
+        X_train = TRAIN[['sentence_1', 'sentence_2']].values.tolist()
+        X_test = TEST[['sentence_1', 'sentence_2']].values.tolist()
+        y_train = TRAIN['label'].values
+        y_test = TEST['label'].values
+    return X_train, y_train, X_test, y_test
+
+class ProbingDataset:
+    """Class to feel nlp probing tasks
+    """
+    def __init__(self, model_path: str, filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Callable]):
         self.fpath = filepath
         self.dname = dataset_name
         self.feature_column = feature_column
         self.tokenizer = BertTokenizer.from_pretrained(Constants.MODELS_PATH[model_path]["None"])
         self.maxlen = 0 
+
+    def loadCSV(self, sep: str = ","):
+        pass
+
+    def loadCustomFile(self, preprocessing_fn: Callable):
+        pass
 
     def loadHuggingFaceDataset(self):
         self.task_data = load_from_disk(dataset_path = self.fpath)
