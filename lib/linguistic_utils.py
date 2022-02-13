@@ -1,14 +1,17 @@
 from ctypes import Union, Str, Dict
+from genericpath import exists
 from .constants import Constants
 from .func_utils import print_if_debug, label_batch
 
 from torchaudio import load, transforms
 from datasets import load_dataset, load_from_disk
-from transformers import BertTokenizer
+from transformers import BertTokenizer, Wav2Vec2Processor, T5Tokenizer
 from datasets import Dataset, DatasetDict
 from collections import Callable
 import json
+import os
 import pandas as pd
+import csv
 import numpy as np
 from typing import Any, List, Optional
 
@@ -93,16 +96,43 @@ class LinguisticDataset:
         return new_dataset
 
 
+class Processor(object):
+    def __init__(self, tokenizer, model_path: str) -> None:
+        self.cc = Constants
+        self.tokenizer = tokenizer.from_pretrained(model_path, cache_dir = self.cc.CACHE_DIR)
+    def __call__(self, batch, max_len: int, data_column: str = "data"): raise NotImplementedError("")
 
+class BertProcessor(Processor):
+    def __init__(self, tokenizer = BertTokenizer, model_path: str = 'bert-large_uncased') -> None:
+        super().__init__(tokenizer, model_path)
+    def __call__(self, batch, max_len: int, data_column: str = "data"):
+        inputs = self.tokenizer(batch[data_column], return_tensors = 'pt',  
+                                    max_length = max_len, truncation = True, padding = 'max_length')
+        batch['input_values'] = inputs.input_ids
+        batch['attention_mask'] = inputs.attention_mask
+        return batch
+
+class Wav2Vec2Processor(Processor):
+    def __init__(self, tokenizer = Wav2Vec2Processor, model_path: str = '') -> None:
+        super().__init__(tokenizer, model_path)
+    def __call__(self, batch, max_len: int, data_column: str = "speech"):
+        inputs = self.tokenizer(batch[data_column], sampling_rate = batch["sampling_rate"], return_tensors = "pt", 
+                                padding = 'max_length', truncation = 'max_length', max_length = max_len)
+        batch['input_values'] = inputs.input_values
+        batch['attention_mask'] = inputs.attention_mask
+        return batch
+
+class T5Processor(Processor):
+    def __init__(self, tokenizer = T5Tokenizer, model_path: str = '') -> None:
+        super().__init__(tokenizer, model_path)
+    def __call__(self, batch, max_len: int, data_column: str = "data"):
+        pass
+    
 # def add_new_features(batch, max_len: int, **kwargs):
 #         processor =  Wav2Vec2Processor.from_pretrained(self.model_path, cache_dir = self.cc.CACHE_DIR)
 
 #         """Preprocessing audio features with padding to maximum lenght"""
-#         inputs = processor(batch["speech"], sampling_rate = batch["sampling_rate"], return_tensors = "pt", 
-#                             padding = 'max_length', truncation = 'max_length', max_length = max_len)
-#         batch['input_values'] = inputs.input_values
-#         batch['attention_mask'] = inputs.attention_mask
-#         return batch
+#         
 
 class DatasetProcessor(object):
     def __init__(self, dataset_type: str, 
@@ -111,6 +141,7 @@ class DatasetProcessor(object):
                        feature_column: str, tokenizer: Optional[Callable] = None):
         supported_datasets = ['senteval', 'person', 'conn', 'DC', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
         assert dataset_type in supported_datasets, "no other types are not currently supported"
+        self.dtype = dataset_type
         self.tokenizer = tokenizer
         self.fpath = filepath
         self.mpath = model_path
@@ -123,8 +154,75 @@ class DatasetProcessor(object):
     def process_dataset(self, processing_fn: Callable = None):
         raise NotImplementedError("")
 
-class NLPDatasetProcessor(DatasetProcessor): pass
+class NLPDatasetProcessor(DatasetProcessor): 
+    def __init__(self, dataset_type: str, model_path: Union[Str, Dict], filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Callable] = None):
+        super().__init__(dataset_type, model_path, filepath, dataset_name, feature_column, tokenizer)
+    def download_data(self) -> str:
+        _repr = ''
+        if self.dtype == 'senteval': pass
+        elif self.dtype == 'person' : pass
+        elif self.dtype == 'conn': pass
+        elif self.dtype == 'DC': pass
+        elif self.dtype == 'PDTB': pass
+        else: pass
 
+    def load_TXT_file(self):
+        import io
+        self.task_data = {'train': {'data': [], self.feature_column: []},
+                              'dev': {'data': [], self.feature_column: []},
+                              'test': {'data': [], self.feature_column: []}}
+        tok2split = {'tr': 'train', 'va': 'dev', 'te': 'test'}
+        with io.open(self.fpath, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.rstrip().split('\t')
+                text = line[-1].split()
+                self.maxlen = max(len(text), self.maxlen)
+
+                self.task_data[tok2split[line[0]]]['data'].append(" ".join(text))
+                self.task_data[tok2split[line[0]]][self.feature_column].append(line[1])
+
+        labels = sorted(np.unique(self.task_data['train'][self.feature_column]))
+        self.tok2label = dict(zip(labels, range(len(labels))))
+        nclasses = len(self.tok2label)
+
+        for split in self.task_data:
+            for i, y in enumerate(self.task_data[split][self.feature_column]):
+                self.task_data[split][self.feature_column][i] = self.tok2label[y]
+
+        def load_CSV_file(self, sep = ',', data_cols: Union[Str, List] = 'data'):
+            import io
+            self.task_data = {'train': {'data': [], self.feature_column: []},
+                                    'dev': {'data': [], self.feature_column: []},
+                                    'test': {'data': [], self.feature_column: []}}
+            tok2split = {'tr': 'train', 'va': 'dev', 'te': 'test'}
+            with csv.reader(self.fpath, 'r', delimiter = sep) as f:
+                for line in f:
+                    line = line.rstrip().split('\t') ####?????
+                    text = line[-1].split()
+                    self.maxlen = max(len(text), self.maxlen)
+
+                    self.task_data[tok2split[line[0]]]['data'].append(" ".join(text))
+                    self.task_data[tok2split[line[0]]][self.feature_column].append(line[1])
+
+            labels = sorted(np.unique(self.task_data['train'][self.feature_column]))
+            self.tok2label = dict(zip(labels, range(len(labels))))
+            nclasses = len(self.tok2label)
+
+        for split in self.task_data:
+            for i, y in enumerate(self.task_data[split][self.feature_column]):
+                self.task_data[split][self.feature_column][i] = self.tok2label[y]
+
+    def process_dataset(self, processing_fn: Callable = None, data_col: Union[Str, List] = "data"): 
+        if not os.path.exists(self.fpath): _ = self.download_data() 
+        if load_from_disk:
+            dataset = self.task_data.map(processing_fn, fn_kwargs = {'maxlen': 20, 'data_col': data_col})
+        else:
+            dataset = DatasetDict()
+            for k, v in self.task_data.items(): 
+                dataset[k] = Dataset.from_dict(v)
+                dataset[k] = dataset[k].map(processing_fn, fn_kwargs = {'maxlen': self.maxlen, 'data_col': data_col} )
+        dataset.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
+        dataset.save_to_disk(self.dname)
 
 
 def load_files(dataset, path=None):
