@@ -1,3 +1,4 @@
+from ctypes import Union, Str, Dict
 from .constants import Constants
 from .func_utils import print_if_debug, label_batch
 
@@ -9,7 +10,7 @@ from collections import Callable
 import json
 import pandas as pd
 import numpy as np
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 modes = ['word_detail', 'phonetic_detail']
 class LinguisticDataset:
@@ -102,6 +103,27 @@ class LinguisticDataset:
 #         batch['input_values'] = inputs.input_values
 #         batch['attention_mask'] = inputs.attention_mask
 #         return batch
+
+class DatasetProcessor(object):
+    def __init__(self, dataset_type: str, 
+                       model_path: Union[Str, Dict],
+                       filepath: str, dataset_name: str, 
+                       feature_column: str, tokenizer: Optional[Callable] = None):
+        supported_datasets = ['senteval', 'person', 'conn', 'DC', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
+        assert dataset_type in supported_datasets, "no other types are not currently supported"
+        self.tokenizer = tokenizer
+        self.fpath = filepath
+        self.mpath = model_path
+        self.dname = dataset_name
+        self.feature_column = feature_column
+        self.maxlen = 0 
+    
+    def load_files(self, from_disk = False, data_col: Union[Str, List] = 'data'):
+        raise NotImplementedError("")
+    def process_dataset(self, processing_fn: Callable = None):
+        raise NotImplementedError("")
+
+class NLPDatasetProcessor(DatasetProcessor): pass
 
 
 
