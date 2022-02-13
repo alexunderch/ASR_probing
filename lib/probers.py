@@ -1,5 +1,5 @@
 from ast import Str
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 import torch
 from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration
 from datasets import load_from_disk
@@ -125,7 +125,7 @@ class Prober:
         raise NotImplementedError("")
 
 class BertOProber(Prober):
-    def __init__(self, model_path: Any[Str, Dict], writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+    def __init__(self, model_path: Union[Str, Dict], writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
         super().__init__(BertModel, model_path, writer, data, device, init_strategy)
         if init_strategy is not None:
             print_if_debug("reseting network parameters...", self.cc.DEBUG)
@@ -173,73 +173,30 @@ class BertOProber(Prober):
                                     clf = LinearModel(**model_config),
                                     enable_grads = enable_grads
                                     ).to(self.device)
+            probing_model.eval()
             self.writer.add_graph(probing_model, input_to_model = [inputs, attention_masks])
-            
             tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
-                        loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3 )
-            optim = torch.optim.Adam(probing_model.parameters(), lr = 3. * 1e-3)
-
+                         loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
+            print_if_debug("training...", self.cc.DEBUG)
             _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max = 10)
-            # probing_model.eval()
-
-            # self.logger.log_string(f"training...")    
-            # probing_model.train()
-            # with self.profiler.profile('train') as prof:
-            #     for epoch in range(self.cc.N_EPOCHS):
-            #         self.logger.log_string(f"{epoch} out of {self.cc.N_EPOCHS}")    
-            #         train_loss = []
-            #         for step, batch in tqdm(enumerate(self.dataloader), total = len(self.dataloader)):
-            #             inputs, attention_masks, labels = _prepare_data(batch)
-            #             optim.zero_grad()
-
-            #             logits = probing_model(inputs, attention_masks)
-            #             loss = loss_fn(labels, logits, probing_model.clf)
-            #             train_loss.append(loss.cpu().item()) 
-
-            #             loss.backward()
-            #             optim.step()
-            #             prof.step()
-            #             self._clear_cache()
-            #         self.writer.add_scalar("training loss of layer {}".format(layer), np.mean(train_loss), epoch * len(self.dataloader))
-            #         scheduler.step()    
-            print_if_debug("validating...", self.cc.DEBUG)
+            
 
             if save_outputs:
                 chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
                                             task_title = "" if task_title is None else task_title,
-                                            params = model_config, layer_idx = layer, optimizer = optim)
+                                            params = model_config, layer_idx = layer, optimizer = tr.optimizer)
                 print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
             
             self._clear_cache()
-
-            # probing_model = probing_model.to(self.device)
-
-            # metrics_per_layer, losses_per_layer = [], [] 
-            # probing_model.eval()
-            # self.logger.log_string(f"validating")
-            # with self.profiler.profile('validation') as prof:
-            #     for step, batch in tqdm(enumerate(self.validloader), total = len(self.validloader)):
-            #         inputs, attention_masks, labels = _prepare_data(batch)
-            #         with torch.no_grad(): 
-            #             logits = probing_model(inputs, attention_masks)
-            #         loss = loss_fn(labels, logits, probing_model.clf)
-            #         f1 = f1_score(torch.argmax(logits.detach().cpu(), dim = -1).numpy(), labels.detach().cpu().numpy(), average = 'weighted')
-            #         metrics_per_layer.append(f1)
-            #         losses_per_layer.append(loss.cpu().item())
-            #         prof.step()
-            #         self._clear_cache()
-
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score("f1_score"))            
+            print_if_debug("validating...", self.cc.DEBUG)
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = task_title["metrics"])            
             probing_info['loss'].append(valid_loss)
             probing_info['metrics'].append(valid_metrics)
 
             self.writer.add_scalar("test loss", valid_loss, layer)
             self.writer.add_scalar("test f1", valid_metrics, layer)    
-
             
             probing_model = probing_model.cpu()
-            del optim
             del probing_model
             self.logger.log_string(self.profiler.rep + "\n")
 
@@ -342,68 +299,28 @@ class Wav2Vec2Prober(Prober):
                                        enable_grads = enable_grads
                                        ).to(self.device)
                                        
-                optim = torch.optim.Adam(probing_model.parameters(), lr = 3. * 1e-3)
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max = 10)
                 probing_model.eval()
                 self.writer.add_graph(probing_model, input_to_model = [inputs, attention_masks])
-                self.logger.log_string(f"training...")
+                tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
+                         loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
+                print_if_debug("training...", self.cc.DEBUG)
+                _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
                 
-                probing_model.train()
-                with self.profiler.profile('train') as prof:
-                    for epoch in range(self.cc.N_EPOCHS):
-                        self.logger.log_string(f"{epoch} out of {self.cc.N_EPOCHS}")
-                        train_loss = []
-                        for step, batch in tqdm(enumerate(self.dataloader), total = len(self.dataloader)):
-                            inputs, attention_masks, labels = _prepare_data(batch)
-                            optim.zero_grad()
-
-                            logits = probing_model(inputs, attention_masks)
-                            loss = loss_fn(labels, logits, probing_model.clf)
-                            train_loss.append(loss.cpu().item()) 
-
-                            loss.backward()
-                            optim.step()
-                            prof.step()
-                            self._clear_cache()
-                        self.writer.add_scalar("training loss of layer {}".format(layer), np.mean(train_loss), epoch * len(self.dataloader))
-                        scheduler.step()    
-                print_if_debug("validating...", self.cc.DEBUG)
 
                 if save_outputs:
                     chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
-                                               task_title = "" if task_title is None else task_title,
-                                               params = model_config, layer_idx = layer, optimizer = optim)
+                                                task_title = "" if task_title is None else task_title,
+                                                params = model_config, layer_idx = layer, optimizer = tr.optimizer)
                     print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
                 
                 self._clear_cache()
-
-                probing_model = probing_model.to(self.device)
-
-                metrics_per_layer, losses_per_layer = [], [] 
-                probing_model.eval()
-                self.logger.log_string(f"validating...")
-
-                with self.profiler.profile('validation') as prof:
-                    for step, batch in tqdm(enumerate(self.validloader), total = len(self.validloader)):
-                        inputs, attention_masks, labels = _prepare_data(batch)
-                        with torch.no_grad(): 
-                            logits = probing_model(inputs, attention_masks)
-                        loss = loss_fn(labels, logits, probing_model.clf)
-                        f1 = f1_score(torch.argmax(logits.detach().cpu(), dim = -1).numpy(), labels.detach().cpu().numpy(), average = 'weighted')
-                        metrics_per_layer.append(f1)
-                        losses_per_layer.append(loss.cpu().item())
-                        prof.step()
-                        self._clear_cache()
-                            
-                probing_info['loss'].append(np.mean(losses_per_layer))
-                probing_info['metrics'].append(np.mean(metrics_per_layer))
-
-                self.writer.add_scalar("test loss", np.mean(losses_per_layer), layer)
-                self.writer.add_scalar("test f1", np.mean(metrics_per_layer), layer)    
+                print_if_debug("validating...", self.cc.DEBUG)
+                valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]))            
+                probing_info['loss'].append(valid_loss)
+                probing_info['metrics'].append(valid_metrics)
 
                
-                probing_model = probing_model.cpu()
-                del optim
+                probing_model = probing_model.cpu()                
                 del probing_model
                 self.logger.log_string(self.profiler.rep + "\n")
 
@@ -491,67 +408,27 @@ class T5Prober(Prober):
                                     clf = LinearModel(**model_config),
                                     enable_grads = enable_grads
                                     ).to(self.device)
-            optim = torch.optim.Adam(probing_model.parameters(), lr = 3. * 1e-3)
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max = 10)
             probing_model.eval()
             self.writer.add_graph(probing_model, input_to_model = [inputs, attention_masks])
-            self.logger.log_string(f"training...")
+            tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
+                    loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
+            print_if_debug("training...", self.cc.DEBUG)
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
             
-            probing_model.train()
-            with self.profiler.profile('train') as prof:
-                for epoch in range(self.cc.N_EPOCHS):
-                    self.logger.log_string(f"{epoch} out of {self.cc.N_EPOCHS}")
-                    train_loss = []
-                    for step, batch in tqdm(enumerate(self.dataloader), total = len(self.dataloader)):
-                        inputs, attention_masks, labels = _prepare_data(batch)
-                        optim.zero_grad()
-
-                        logits = probing_model(inputs, attention_masks)
-                        loss = loss_fn(labels, logits, probing_model.clf)
-                        train_loss.append(loss.cpu().item()) 
-
-                        loss.backward()
-                        optim.step()
-                        prof.step()
-                        self._clear_cache()
-                    self.writer.add_scalar("training loss of layer {}".format(layer), np.mean(train_loss), epoch * len(self.dataloader))
-                    scheduler.step()    
-            print_if_debug("validating...", self.cc.DEBUG)
 
             if save_outputs:
                 chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
                                             task_title = "" if task_title is None else task_title,
-                                            params = model_config, layer_idx = layer, optimizer = optim)
+                                            params = model_config, layer_idx = layer, optimizer = tr.optimizer)
                 print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
             
             self._clear_cache()
-
-            probing_model = probing_model.to(self.device)
-
-            metrics_per_layer, losses_per_layer = [], [] 
-            probing_model.eval()
-            self.logger.log_string(f"validating...")
-
-            with self.profiler.profile('validation') as prof:
-                for step, batch in tqdm(enumerate(self.validloader), total = len(self.validloader)):
-                    inputs, attention_masks, labels = _prepare_data(batch)
-                    with torch.no_grad(): 
-                        logits = probing_model(inputs, attention_masks)
-                    loss = loss_fn(labels, logits, probing_model.clf)
-                    f1 = f1_score(torch.argmax(logits.detach().cpu(), dim = -1).numpy(), labels.detach().cpu().numpy(), average = 'weighted')
-                    metrics_per_layer.append(f1)
-                    losses_per_layer.append(loss.cpu().item())
-                    prof.step()
-                    self._clear_cache()
-                        
-            probing_info['loss'].append(np.mean(losses_per_layer))
-            probing_info['metrics'].append(np.mean(metrics_per_layer))
-
-            self.writer.add_scalar("test loss", np.mean(losses_per_layer), layer)
-            self.writer.add_scalar("test f1", np.mean(metrics_per_layer), layer)    
+            print_if_debug("validating...", self.cc.DEBUG)
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = task_title["metrics"])            
+            probing_info['loss'].append(valid_loss)
+            probing_info['metrics'].append(valid_metrics)   
 
             probing_model = probing_model.cpu()
-            del optim
             del probing_model
             self.logger.log_string(self.profiler.rep + "\n")
 
