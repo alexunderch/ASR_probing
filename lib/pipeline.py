@@ -154,7 +154,7 @@ class Probing_pipeline:
         print('done')
         return self
     
-    def run_probing(self, probing_taskk: Prober, probing_fn, layers: list, enable_grads = False, use_variational: bool = False, init_strategy: str = None, plotting_fn: Callable = None, 
+    def run_probing(self, probing_taskk: Prober, probing_fn, layers: list, checkpoint_path: str = None, enable_grads = False, use_variational: bool = False, init_strategy: str = None, plotting_fn: Callable = None, 
                     save_checkpoints: bool = False, plotting_config: dict = None, **kwargs) -> dict:
         """Main probing runner
         Args:
@@ -170,7 +170,7 @@ class Probing_pipeline:
            plotting_config, dict ({"title": str, "metrics": list of used in pro bing fn metrics, "save_path": str}), default = None
         """
         probing_task = probing_taskk(self.model_path, self.writer, data = self.dataset, init_strategy = init_strategy, device = self.device)
-        probing_task.get_resources(load_data = False, batch_size = self.cc.BATCH_SIZE, **kwargs)
+        probing_task.get_resources(load_data = False, checkpoint_path = checkpoint_path, batch_size = self.cc.BATCH_SIZE, **kwargs)
        
 
         probing_results = probing_task.make_probe(probing_fn, use_variational = use_variational, enable_grads = enable_grads, layers = layers, 

@@ -52,7 +52,7 @@ class Prober:
         self.profiler.on() if self.cc.PROFILING else self.profiler.off() 
         self.profiler.profile()
 
-    def get_resources(self, load_data: bool = False, data_path: str = None, batch_size: int = 100, 
+    def get_resources(self, load_data: bool = False, data_path: str = None, checkpoint_path: str = None, batch_size: int = 100, 
                       poisoning_ratio: float = 0, poisoning_mapping: Callable = None, **kwargs) -> None:
         """
         Args:
@@ -60,6 +60,8 @@ class Prober:
                            default = False
           data_path, str: optional, active only if load_data = True;
                           default = None
+          checkpoint_path, str: a path to pretrained model checkpoint
+                                default = None
           batch_size, int: optional;
                            default = 100
           poisoning_ratio, float: the ratio of adding misleading labels to the data (0 -- None, 1 -- fully random);
@@ -76,6 +78,10 @@ class Prober:
                 if mapping is not None: batch['label'] = mapping(batch['label']) 
                 else: batch['label'] = np.random.randint(0, n_classes)
             return batch        
+
+        if checkpoint_path is not None:
+            assert isinstance(checkpoint_path, str) and os.path.exists(checkpoint_path)
+            self.model.load_state_dict(checkpoint_path)
         
         if load_data: 
             assert isinstance(data_path, str)
