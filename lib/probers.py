@@ -7,7 +7,7 @@ from datasets import Dataset, DatasetDict
 from .profilers import CheckPointer, ProbingProfiler, MyLogger
 from .func_utils import print_if_debug
 from .constants import Constants
-
+from .trainer import Trainer, F1Score
 from .clf import LinearModel, Loss
 from sklearn.metrics import f1_score
 
@@ -173,31 +173,36 @@ class BertOProber(Prober):
                                     clf = LinearModel(**model_config),
                                     enable_grads = enable_grads
                                     ).to(self.device)
-            optim = torch.optim.Adam(probing_model.parameters(), lr = 3. * 1e-3)
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max = 10)
-            probing_model.eval()
-
             self.writer.add_graph(probing_model, input_to_model = [inputs, attention_masks])
-            self.logger.log_string(f"training...")    
-            probing_model.train()
-            with self.profiler.profile('train') as prof:
-                for epoch in range(self.cc.N_EPOCHS):
-                    self.logger.log_string(f"{epoch} out of {self.cc.N_EPOCHS}")    
-                    train_loss = []
-                    for step, batch in tqdm(enumerate(self.dataloader), total = len(self.dataloader)):
-                        inputs, attention_masks, labels = _prepare_data(batch)
-                        optim.zero_grad()
+            
+            tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
+                        loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3 )
+            optim = torch.optim.Adam(probing_model.parameters(), lr = 3. * 1e-3)
 
-                        logits = probing_model(inputs, attention_masks)
-                        loss = loss_fn(labels, logits, probing_model.clf)
-                        train_loss.append(loss.cpu().item()) 
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max = 10)
+            # probing_model.eval()
 
-                        loss.backward()
-                        optim.step()
-                        prof.step()
-                        self._clear_cache()
-                    self.writer.add_scalar("training loss of layer {}".format(layer), np.mean(train_loss), epoch * len(self.dataloader))
-                    scheduler.step()    
+            # self.logger.log_string(f"training...")    
+            # probing_model.train()
+            # with self.profiler.profile('train') as prof:
+            #     for epoch in range(self.cc.N_EPOCHS):
+            #         self.logger.log_string(f"{epoch} out of {self.cc.N_EPOCHS}")    
+            #         train_loss = []
+            #         for step, batch in tqdm(enumerate(self.dataloader), total = len(self.dataloader)):
+            #             inputs, attention_masks, labels = _prepare_data(batch)
+            #             optim.zero_grad()
+
+            #             logits = probing_model(inputs, attention_masks)
+            #             loss = loss_fn(labels, logits, probing_model.clf)
+            #             train_loss.append(loss.cpu().item()) 
+
+            #             loss.backward()
+            #             optim.step()
+            #             prof.step()
+            #             self._clear_cache()
+            #         self.writer.add_scalar("training loss of layer {}".format(layer), np.mean(train_loss), epoch * len(self.dataloader))
+            #         scheduler.step()    
             print_if_debug("validating...", self.cc.DEBUG)
 
             if save_outputs:
@@ -208,28 +213,29 @@ class BertOProber(Prober):
             
             self._clear_cache()
 
-            probing_model = probing_model.to(self.device)
+            # probing_model = probing_model.to(self.device)
 
-            metrics_per_layer, losses_per_layer = [], [] 
-            probing_model.eval()
-            self.logger.log_string(f"validating")
-            with self.profiler.profile('validation') as prof:
-                for step, batch in tqdm(enumerate(self.validloader), total = len(self.validloader)):
-                    inputs, attention_masks, labels = _prepare_data(batch)
-                    with torch.no_grad(): 
-                        logits = probing_model(inputs, attention_masks)
-                    loss = loss_fn(labels, logits, probing_model.clf)
-                    f1 = f1_score(torch.argmax(logits.detach().cpu(), dim = -1).numpy(), labels.detach().cpu().numpy(), average = 'weighted')
-                    metrics_per_layer.append(f1)
-                    losses_per_layer.append(loss.cpu().item())
-                    prof.step()
-                    self._clear_cache()
-                        
-            probing_info['loss'].append(np.mean(losses_per_layer))
-            probing_info['metrics'].append(np.mean(metrics_per_layer))
+            # metrics_per_layer, losses_per_layer = [], [] 
+            # probing_model.eval()
+            # self.logger.log_string(f"validating")
+            # with self.profiler.profile('validation') as prof:
+            #     for step, batch in tqdm(enumerate(self.validloader), total = len(self.validloader)):
+            #         inputs, attention_masks, labels = _prepare_data(batch)
+            #         with torch.no_grad(): 
+            #             logits = probing_model(inputs, attention_masks)
+            #         loss = loss_fn(labels, logits, probing_model.clf)
+            #         f1 = f1_score(torch.argmax(logits.detach().cpu(), dim = -1).numpy(), labels.detach().cpu().numpy(), average = 'weighted')
+            #         metrics_per_layer.append(f1)
+            #         losses_per_layer.append(loss.cpu().item())
+            #         prof.step()
+            #         self._clear_cache()
 
-            self.writer.add_scalar("test loss", np.mean(losses_per_layer), layer)
-            self.writer.add_scalar("test f1", np.mean(metrics_per_layer), layer)    
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score("f1_score"))            
+            probing_info['loss'].append(valid_loss)
+            probing_info['metrics'].append(valid_metrics)
+
+            self.writer.add_scalar("test loss", valid_loss, layer)
+            self.writer.add_scalar("test f1", valid_metrics, layer)    
 
             
             probing_model = probing_model.cpu()
