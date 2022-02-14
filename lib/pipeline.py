@@ -2,7 +2,7 @@ from .func_utils import NumpyEncoder, print_if_debug
 from .probers import Prober
 import torch
 from datasets import load_dataset, load_from_disk
-from transformers import Wav2Vec2Processor, logging as log_models
+from transformers import logging as log_models
 from datasets import Dataset, DatasetDict, set_caching_enabled, logging as log_data
 
 import json
@@ -99,7 +99,7 @@ class Probing_pipeline:
         """All labels """
         return self.f_set
 
-    def preprocess_data(self, preprocessig_fn: Callable, feature_processing_fn: Callable, save_path: str = None, drop_columns: list = None, target_processing: Callable = None):
+    def preprocess_data(self, preprocessing_fn: Callable, feature_processing_fn: Callable, save_path: str = None, drop_columns: list = None, target_processing: Callable = None):
         """
         Args:
             preprocessinf_fn, callable object: prerpocessing dataset function to load all audio, should return the same self.dataset
@@ -116,15 +116,15 @@ class Probing_pipeline:
             """Label Encoder
             """
             example["label"] = self.f_set[example[feature_column]]
+            
             return example
 
         print_if_debug('reading files...', self.cc.DEBUG)
-        if preprocessig_fn is not None:
-            self.dataset = self.dataset.map(preprocessig_fn, fn_kwargs = {'feature_column': self.feature}, disable_nullable = False)
+        if preprocessing_fn is not None:
+            self.dataset = self.dataset.map(preprocessing_fn, fn_kwargs = {'feature_column': self.feature}, disable_nullable = False)
         print_if_debug('encoding features...', self.cc.DEBUG)
         self._filter_data(self.own_feature_set, self.only_custom_features)
         self.dataset = self.dataset.map(encode_labels, fn_kwargs = {'feature_column': self.feature})
-
         print_if_debug('processing features...', self.cc.DEBUG)
         if feature_processing_fn is not None:
             self.dataset = self.dataset.map(feature_processing_fn, fn_kwargs = {'feature_column': self.feature, 

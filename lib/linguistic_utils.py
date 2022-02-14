@@ -1,16 +1,16 @@
 from typing import Union,  Dict
 from .constants import Constants
 from .func_utils import print_if_debug, label_batch
+from .tokenizers import Processor
+
 
 from torchaudio import load, transforms
 from datasets import load_dataset, load_from_disk
-from transformers import BertTokenizer, Wav2Vec2Processor, T5Tokenizer
 from datasets import Dataset, DatasetDict
 from collections import Callable
 import json
 import os
 import pandas as pd
-import csv
 import numpy as np
 from typing import Any, List, Optional
 
@@ -95,59 +95,23 @@ class LinguisticDataset:
         return new_dataset
 
 
-class Processor(object):
-    """A base processor class. It is needed to wrap a tokenizer"""
-    def __init__(self, model_path: str, tokenizer: Callable = None) -> None:
-        """Args:
-            model_path, str: a path to pretrained HuggingFace tokenizer checkpoint
-            tokenizer, Callable: a tokenizer class of HuggingFace transformers library
-                                 default = None
-        """
-        self.cc = Constants
-        self.tokenizer = tokenizer.from_pretrained(model_path, cache_dir = self.cc.CACHE_DIR)
-    def __call__(self, batch, max_len: int, data_column: str = "data"): 
-        """Preprocessing the given features with padding to maximum lenght"""
-        raise NotImplementedError("")
-
-class BertProcessor(Processor):
-    def __init__(self, model_path) -> None:
-        super().__init__(tokenizer = BertTokenizer, model_path = model_path)
-    def __call__(self, batch, max_len: int, data_column: str = "data"):
-        """Preprocessing text features with padding to maximum lenght"""
-        inputs = self.tokenizer(batch[data_column], return_tensors = 'pt',  
-                                    max_length = max_len, truncation = True, padding = 'max_length')
-        batch['input_values'] = inputs.input_ids
-        batch['attention_mask'] = inputs.attention_mask
-        return batch
-
-class Wav2Vec2Processor(Processor):
-    def __init__(self, model_path) -> None:
-        super().__init__(tokenizer = Wav2Vec2Processor, model_path =  model_path)
-    def __call__(self, batch, max_len: int, data_column: str = "speech"):
-        """Preprocessing audio features with padding to maximum lenght"""
-        inputs = self.tokenizer(batch[data_column], sampling_rate = batch["sampling_rate"], return_tensors = "pt", 
-                                padding = 'max_length', truncation = 'max_length', max_length = max_len)
-        batch['input_values'] = inputs.input_values
-        batch['attention_mask'] = inputs.attention_mask
-        return batch
-
-class T5Processor(Processor):
-    def __init__(self, model_path: str) -> None:
-        super().__init__(tokenizer = T5Tokenizer, model_path = model_path)
-    def __call__(self, batch, max_len: int, data_column: str = "data"):
-        """Preprocessing text features with padding to maximum lenght"""
-        inputs = self.tokenizer(batch[data_column], return_tensors = 'pt',  
-                                    max_length = max_len, truncation = True, padding = 'max_length')
-        batch['input_values'] = inputs.input_ids
-        batch['attention_mask'] = inputs.attention_mask
-        return batch
     
 
 class DatasetProcessor(object):
+    """Base class for dataset processing. Outputs a HiggingFace-formatted dataset"""
     def __init__(self, dataset_type: str, 
                        model_path: Union[str, Dict],
                        filepath: str, dataset_name: str, 
-                       feature_column: str, tokenizer: Optional[Callable] = None):
+                       feature_column: str, tokenizer: Optional[Callable] = None) -> None:
+
+        """Args:
+            dataset_type, str: one of precomputed dataset_types: ['senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
+            model_path, str: path to a pretained tokenizer on HuggingFace Hub
+            filepath, str: where to save a dataset
+            dataset_name, str: a name for dataset
+            feature_column, str: a column name where the labels can be found
+            tokenizer, Processor: a tokenizer to process inputs
+        """
         supported_datasets = ['senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
         assert dataset_type in supported_datasets, "no other types are not currently supported"
         self.dtype = dataset_type
@@ -161,9 +125,14 @@ class DatasetProcessor(object):
                         'dev': {'data': [], self.feature_column: []},
                         'test': {'data': [], self.feature_column: []}}
     
-    def load_files(self, from_disk = False, data_col: Union[str, List] = 'data'):
-        raise NotImplementedError("")
-    def process_dataset(self, processing_fn: Callable = None):
+    def process_dataset(self, data_col: Union[str, List] = "data", load_from_disk = False) -> Union[Dataset, DatasetDict]:
+        """A main processing function of the class.
+        Args: 
+            data_col, str: a column with necessary modality
+            load_from_disk, bool: whether to load the data from disk or not
+                                  default = False
+        """
+
         raise NotImplementedError("")
 
 class NLPDatasetProcessor(DatasetProcessor): 

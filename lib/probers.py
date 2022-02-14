@@ -91,11 +91,11 @@ class Prober:
             self.data = self.data.map(poison_data, fn_kwargs = {"n_classes": np.max(self.data['label']),
                                                                                     'ratio': poisoning_ratio,
                                                                                      'mapping': poisoning_mapping})
+        print(self.data['label'][:5])
             
         self.data.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
 
         splitted_dataset = self.data.train_test_split(test_size = 0.25, seed = 42)
-
         weights = 1. / np.bincount(splitted_dataset['train']['label'])
         self.class_weight = np.array([weights[l] for l in splitted_dataset['train']['label']])
         self.dataloader = torch.utils.data.DataLoader(splitted_dataset['train'], batch_size = batch_size,
@@ -123,7 +123,7 @@ class Prober:
                 from_memory, str: optionally load probing data from memory (currently deprecated)
                 save_outputs, bool: optional flag, whether to save probing data
                                     default = False
-                task_tilte, str: optional way to save probing data, active only if save_outputs = True;
+                task_tilte, dict: optional way to save probing data, active only if save_outputs = True;
                                 default = None
             Returns:
               result, np.ndarray: float array of [#layers, ] output metric results
@@ -211,20 +211,7 @@ class BertOProber(Prober):
 
 class Wav2Vec2Prober(Prober):
     def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
-        """ Probing tasks class.
-        Args:
-            model_path, str: path to model in Hugging Face repo
-            data, Dataset: optional, Hugging Face Dataset class 
-                           default = None
-            device: torch.device, accelerator
-            init_strategy: str, flag (use randomly initialized model or downloaded from repo)
-                             supported strategies: 
-                                -- full 
-                                -- (only) encoder
-                                -- (only) feature_extractors
-                                default = None
-            init_func, callable: a function which has args: a model and a strategy and returns None
-        """
+
         super().__init__(Wav2Vec2ForCTC, model_path, writer, data, device, init_strategy)
 
         if init_strategy is not None:
@@ -335,20 +322,6 @@ class Wav2Vec2Prober(Prober):
 
 class T5Prober(Prober):
     def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
-        """ Probing tasks class.
-        Args:
-            model_path, str: path to model in Hugging Face repo
-            data, Dataset: optional, Hugging Face Dataset class 
-                           default = None
-            device: torch.device, accelerator
-            init_strategy: str, flag (use randomly initialized model or downloaded from repo)
-                             supported strategies: 
-                                -- full 
-                                -- (only) encoder
-                                -- (only) feature_extractors
-                                default = None
-            init_func, callable: a function which has args: a model and a strategy and returns None
-        """
 
         super().__init__(T5ForConditionalGeneration, model_path, writer, data, device, init_strategy)
         self.model.config.is_decoder = False
