@@ -1,19 +1,5 @@
-from .constants import Constants
 from transformers import BertTokenizer, Wav2Vec2Processor, T5Tokenizer
-from collections import Callable
-class Processor(object):
-    """A base processor class. It is needed to wrap a tokenizer"""
-    def __init__(self, model_path: str, tokenizer: Callable = None) -> None:
-        """Args:
-            model_path, str: a path to pretrained HuggingFace tokenizer checkpoint
-            tokenizer, Callable: a tokenizer class of HuggingFace transformers library
-                                 default = None
-        """
-        self.cc = Constants
-        self.tokenizer = tokenizer.from_pretrained(model_path, cache_dir = self.cc.CACHE_DIR)
-    def __call__(self, batch, max_len: int, data_column: str = "data"): 
-        """Preprocessing the given features with padding to maximum lenght"""
-        raise NotImplementedError("")
+from base.processing import Processor
 
 class BertProcessor(Processor):
     def __init__(self, model_path) -> None:

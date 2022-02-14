@@ -1,7 +1,7 @@
 from typing import Union,  Dict
-from .constants import Constants
-from .func_utils import print_if_debug, label_batch
-from .tokenizers import Processor
+from base.constants import Constants
+from base.utils import print_if_debug, label_batch
+from base.processing import Processor, DatasetProcessor
 
 
 from torchaudio import load, transforms
@@ -12,7 +12,7 @@ import json
 import os
 import pandas as pd
 import numpy as np
-from typing import Any, List, Optional
+from typing import List, Optional
 
 modes = ['word_detail', 'phonetic_detail']
 class LinguisticDataset:
@@ -93,47 +93,6 @@ class LinguisticDataset:
             print_if_debug("adding new features...", debug)
             new_dataset = new_dataset.map(additional_preprocessing, batched = False)
         return new_dataset
-
-
-    
-
-class DatasetProcessor(object):
-    """Base class for dataset processing. Outputs a HiggingFace-formatted dataset"""
-    def __init__(self, dataset_type: str, 
-                       model_path: Union[str, Dict],
-                       filepath: str, dataset_name: str, 
-                       feature_column: str, tokenizer: Optional[Callable] = None) -> None:
-
-        """Args:
-            dataset_type, str: one of precomputed dataset_types: ['senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
-            model_path, str: path to a pretained tokenizer on HuggingFace Hub
-            filepath, str: where to save a dataset
-            dataset_name, str: a name for dataset
-            feature_column, str: a column name where the labels can be found
-            tokenizer, Processor: a tokenizer to process inputs
-        """
-        supported_datasets = ['senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
-        assert dataset_type in supported_datasets, "no other types are not currently supported"
-        self.dtype = dataset_type
-        self.tokenizer = tokenizer(model_path = model_path)
-        self.fpath = filepath
-        self.mpath = model_path
-        self.dname = dataset_name
-        self.feature_column = feature_column
-        self.maxlen = 0 
-        self.task_data = {'train': {'data': [], self.feature_column: []},
-                        'dev': {'data': [], self.feature_column: []},
-                        'test': {'data': [], self.feature_column: []}}
-    
-    def process_dataset(self, data_col: Union[str, List] = "data", load_from_disk = False) -> Union[Dataset, DatasetDict]:
-        """A main processing function of the class.
-        Args: 
-            data_col, str: a column with necessary modality
-            load_from_disk, bool: whether to load the data from disk or not
-                                  default = False
-        """
-
-        raise NotImplementedError("")
 
 class NLPDatasetProcessor(DatasetProcessor): 
     def __init__(self, dataset_type: str, model_path: Union[str, Dict], filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Processor] = None):

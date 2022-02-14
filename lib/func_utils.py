@@ -6,25 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from  IPython.display import clear_output
 
-import json
-from .constants import Constants
+from base.constants import Constants
 from sklearn.linear_model import SGDClassifier, LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, accuracy_score, classification_report
 
-_lang = lambda l: "en" if l is None else l
-print_if_debug = lambda x, flag: print(x) if flag else None
-f_set = lambda col: {v: k for k, v in enumerate(list(set(col)))}
-
 cc = Constants
-class NumpyEncoder(json.JSONEncoder):
-    """ Special json encoder for numpy types """
-    def default(self, obj):
-        if isinstance(obj, np.integer): return int(obj)
-        elif isinstance(obj, np.floating): return float(obj)
-        elif isinstance(obj, np.ndarray): return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
-
 def make_probing(data, labels):
     X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size = 0.33, shuffle = True, random_state=42)
     clf = SGDClassifier(max_iter = 1000, tol = 1e-2, random_state = 42)
@@ -69,10 +56,6 @@ def prepare_probing_task_timit_2(batch, feature_column: str):
     batch[feature_column] = str(val[0]) if len(val) else "other" 
     return batch
 
-def remove_special_characters(batch):
-    chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
-    batch["text"] = re.sub(chars_to_ignore_regex, '', batch["text"]).lower().strip()
-    return batch
 
 def plotting_fn(data, config: dict):
     if not cc.DEBUG: clear_output(wait = True)
@@ -91,18 +74,3 @@ def plotting_fn(data, config: dict):
         assert isinstance(config['save_path'], str)
         pickle.dump(fig, open(config['save_path'] + config['title'] + '.pickle', 'wb'))
 
-
-import nltk
-nltk.download('averaged_perceptron_tagger')
-def pos_tagging_fn(batch):
-    batch['pos_tag'] = nltk.pos_tag([batch['utterance']])[0][1]
-    return batch
-
-def random_labeling_fn(batch, label: str = 'pos_tag', n_classes: int = 10):
-    batch[label + "_random"] = str(np.random.randint(0, n_classes))
-    return batch
-
-def label_batch(batch):
-    batch = pos_tagging_fn(batch)
-    batch = random_labeling_fn(batch)
-    return batch
