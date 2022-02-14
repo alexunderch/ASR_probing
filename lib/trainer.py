@@ -4,18 +4,26 @@ from typing import Callable, List, Any, Tuple, Union
 import torch
 from tqdm import tqdm
 import numpy as np
-from torch.utils.data import DataLoader
 from .profilers import MyLogger, ProbingProfiler
 from .clf import Loss
 import gc
 from sklearn.metrics import f1_score
 class CustomMetrics(object):
+    """A class to add and invent your own callable metrics"""
     def __init__(self, metrics_name: str, fnct: Callable):
+        """Args:
+        """
         self.name  = metrics_name
         self.mfnc = fnct
     def __str__(self) -> str:
         return self.name
     def __call__(self, y_pred: torch.tensor, y_true: torch.tensor, *args: Any, **kwds: Any) -> Union[List, float]:
+        """Args:
+                y_pred, torch.Tensor: outputs of neural networks (logits for regression, distribution for classification)
+                y_true, torch.Tensor: groundtruth labels provided for the supervised learining tasks
+            Returns:
+                list (e.g. per classes) or float computed metrics
+        """
         raise NotImplementedError("")
 
 class F1Score(CustomMetrics):
@@ -26,17 +34,22 @@ class F1Score(CustomMetrics):
         return self.mfnc(torch.argmax(y_pred.cpu(), dim = -1).numpy(), y_true.cpu().numpy(), average = 'weighted')
     
 class Trainer():
+    """This class provides main train and validation functions"""
     def __init__(self, model: torch.nn.Module, logger: MyLogger, profiler: ProbingProfiler, writer: torch.utils.tensorboard.SummaryWriter, 
                        loss_function: Loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, 
                        device: torch.device, callback = None, lr: float = 1e-2) -> None:
 
       """
-      This class provides main train and validation functions
-      Parameters:
-      -- model: class inherited of nn.Module
-      -- loss_fn: torch.nn.loss_fn for the task or inherited class
-      -- optimizer: torch.optim.optimizer for the task
-      -- callback: an initialized object of callback class 
+      Args:
+        model, class inherited of nn.Module
+        logger, MyLogger: own logger class instance
+        profiler, ProbingProfiler: profiler
+        writer, torch.utils.tensorboard.SummaryWriter: tensorboard default writer
+        loss_fn, Loss: torch.nn.loss_fn for the task or inherited class
+        optimizer, torch.optim.optimizer for the task
+        scheduler, torch.optim.lr_scheduler: learning rate for the optimizer
+        device, torch.device: a training device
+        callback: an initialized object of callback class 
       """
       self.model =  model
       self.loss_function = loss_function
@@ -50,10 +63,11 @@ class Trainer():
 
     def train_on_batch(self, x_batch, labels, prof: ProbingProfiler) -> float:
         """
-        This function is need to be implemented for 
+        This function needs to be implemented for 
         any particular model;
-        Parameters:
-        -- x_batch, y_batch: batches of data and target
+        Args:
+            x_batch, labels: batches of data and target
+            prof, ProbingProfiler instance 
         Output: loss: int, value of loss_fn on the batch of data
         """
         _ = self.model.train()
@@ -74,8 +88,11 @@ class Trainer():
             gc.collect()
 
     def train_epoch(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler) -> float:
-        """
-        TBD
+        """Args:
+            train_loader, torch.utils.data.DataLoader
+            batch_processing_fn, callable: a function for processing each batch
+            prof, ProbingProfiler instance 
+        Returns: loss: int, value of loss_fn on the batch of data
         """
         train_loss = []
         for it, batch in tqdm(enumerate(train_loader), total = len(train_loader)):
@@ -90,9 +107,15 @@ class Trainer():
 
     @torch.no_grad()
     def valid_epoch(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, metrics: callable) -> Tuple:
-        """
-        TBD
-        """
+        """Args:
+            valid_loader, torch.utils.data.DataLoader
+            batch_processing_fn, callable: a function for processing each batch
+            prof, ProbingProfiler instance 
+            metrics, callable: own callable metrics
+        Returns: 
+            valid_loss_per_loader: float, value of loss_fn on the batch of data
+            valid_metrics_per_loader: float, value of metrics_fn on the batch of data
+                """
         _ = self.model.eval()
         valid_loss, valid_metrics = [], []
         for it, batch in tqdm(enumerate(valid_loader), total = len(valid_loader)):
@@ -107,11 +130,13 @@ class Trainer():
 
     def train(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, count_of_epoch: int, info: dict):
         """
-        Trainer of the model; 
-        uses train_epoch method
-        Parameters:
-            #TBD
-        Output: self
+        Trainer of the model;  uses `train_epoch` method
+        Args:
+            train_loader, torch.utils.data.DataLoader
+            batch_processing_fn, callable: a function for processing each batch
+            count_of_epoch, int: number of training epochs
+            info, dict: some auxillary info
+        Returns: self
         """
         self.model.train()
         iterations = tqdm(range(count_of_epoch), desc = 'epoch')
@@ -131,6 +156,14 @@ class Trainer():
 
     @torch.no_grad()
     def validate(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, metrics: Callable) -> Tuple:
+        """Args:
+            valid_loader, torch.utils.data.DataLoader
+            batch_processing_fn, callable: a function for processing each batch
+            metrics, callable: own callable metrics
+        Returns: 
+            valid_loss: float, value of loss_fn on the batch of data
+            valid_metrics: float, value of metrics_fn on the batch of data
+        """
         self.model.eval()
         self.logger.log_string(f"validating...")
         with self.profiler.profile('validation') as prof:
