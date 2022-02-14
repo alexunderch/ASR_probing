@@ -17,3 +17,5 @@ nltk
 ipython
 dvc[gdrive]
 torchmetrics==0.7.2
+sentencepiece==0.1.96
+
