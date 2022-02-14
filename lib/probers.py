@@ -141,7 +141,7 @@ class BertOProber(Prober):
         self.writer = writer
         self.data = data
         self.device = device
-    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: str = None) -> dict:
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.fixed_encoder = list(self.model.cpu().encoder.layer)
         self.model.pooler = torch.nn.Identity(1024)
         assert np.alltrue([l > 0 and l < len(self.fixed_encoder) for l in layers])
@@ -189,13 +189,13 @@ class BertOProber(Prober):
 
             if save_outputs:
                 chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
-                                            task_title = "" if task_title is None else task_title,
+                                            task_title = "" if task_title is None else task_title['title'],
                                             params = model_config, layer_idx = layer, optimizer = tr.optimizer)
                 print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = task_title["metrics"])            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]))            
             probing_info['loss'].append(valid_loss)
             probing_info['metrics'].append(valid_metrics)
 
@@ -242,7 +242,7 @@ class Wav2Vec2Prober(Prober):
         self.data = data
         self.device = device
 
-    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: str = None) -> dict:
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.model.freeze_feature_extractor()
         self.fixed_encoder = self.model.wav2vec2.encoder.layers.cpu()
         assert np.alltrue([l > 0 and l < len(self.fixed_encoder) for l in layers])
@@ -315,7 +315,7 @@ class Wav2Vec2Prober(Prober):
 
                 if save_outputs:
                     chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
-                                                task_title = "" if task_title is None else task_title,
+                                                task_title = "" if task_title is None else task_title['title'],
                                                 params = model_config, layer_idx = layer, optimizer = tr.optimizer)
                     print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
                 
@@ -373,7 +373,7 @@ class T5Prober(Prober):
         return [hs.cpu().view((len(hs), -1)).numpy() for hs in output.hidden_states]
         
 
-    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: str = None) -> dict:
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.fixed_encoder = self.model.encoder.block.cpu()
         self.model.lm_head = torch.nn.Identity(512)
 
@@ -424,13 +424,13 @@ class T5Prober(Prober):
 
             if save_outputs:
                 chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
-                                            task_title = "" if task_title is None else task_title,
+                                            task_title = "" if task_title is None else task_title['title'],
                                             params = model_config, layer_idx = layer, optimizer = tr.optimizer)
                 print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = task_title["metrics"])            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]))            
             probing_info['loss'].append(valid_loss)
             probing_info['metrics'].append(valid_metrics)   
 

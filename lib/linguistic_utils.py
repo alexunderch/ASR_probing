@@ -1,5 +1,4 @@
-from ctypes import Union, Str, Dict
-from genericpath import exists
+from typing import Union,  Dict
 from .constants import Constants
 from .func_utils import print_if_debug, label_batch
 
@@ -97,15 +96,24 @@ class LinguisticDataset:
 
 
 class Processor(object):
-    def __init__(self, tokenizer, model_path: str) -> None:
+    """A base processor class. It is needed to wrap a tokenizer"""
+    def __init__(self, model_path: str, tokenizer: Callable = None) -> None:
+        """Args:
+            model_path, str: a path to pretrained HuggingFace tokenizer checkpoint
+            tokenizer, Callable: a tokenizer class of HuggingFace transformers library
+                                 default = None
+        """
         self.cc = Constants
         self.tokenizer = tokenizer.from_pretrained(model_path, cache_dir = self.cc.CACHE_DIR)
-    def __call__(self, batch, max_len: int, data_column: str = "data"): raise NotImplementedError("")
+    def __call__(self, batch, max_len: int, data_column: str = "data"): 
+        """Preprocessing the given features with padding to maximum lenght"""
+        raise NotImplementedError("")
 
 class BertProcessor(Processor):
-    def __init__(self, tokenizer = BertTokenizer, model_path: str = 'bert-large_uncased') -> None:
-        super().__init__(tokenizer, model_path)
+    def __init__(self, model_path) -> None:
+        super().__init__(tokenizer = BertTokenizer, model_path = model_path)
     def __call__(self, batch, max_len: int, data_column: str = "data"):
+        """Preprocessing text features with padding to maximum lenght"""
         inputs = self.tokenizer(batch[data_column], return_tensors = 'pt',  
                                     max_length = max_len, truncation = True, padding = 'max_length')
         batch['input_values'] = inputs.input_ids
@@ -113,9 +121,10 @@ class BertProcessor(Processor):
         return batch
 
 class Wav2Vec2Processor(Processor):
-    def __init__(self, tokenizer = Wav2Vec2Processor, model_path: str = '') -> None:
-        super().__init__(tokenizer, model_path)
+    def __init__(self, model_path) -> None:
+        super().__init__(tokenizer = Wav2Vec2Processor, model_path =  model_path)
     def __call__(self, batch, max_len: int, data_column: str = "speech"):
+        """Preprocessing audio features with padding to maximum lenght"""
         inputs = self.tokenizer(batch[data_column], sampling_rate = batch["sampling_rate"], return_tensors = "pt", 
                                 padding = 'max_length', truncation = 'max_length', max_length = max_len)
         batch['input_values'] = inputs.input_values
@@ -123,48 +132,62 @@ class Wav2Vec2Processor(Processor):
         return batch
 
 class T5Processor(Processor):
-    def __init__(self, tokenizer = T5Tokenizer, model_path: str = '') -> None:
-        super().__init__(tokenizer, model_path)
+    def __init__(self, model_path: str) -> None:
+        super().__init__(tokenizer = T5Tokenizer, model_path = model_path)
     def __call__(self, batch, max_len: int, data_column: str = "data"):
-        pass
+        """Preprocessing text features with padding to maximum lenght"""
+        inputs = self.tokenizer(batch[data_column], return_tensors = 'pt',  
+                                    max_length = max_len, truncation = True, padding = 'max_length')
+        batch['input_values'] = inputs.input_ids
+        batch['attention_mask'] = inputs.attention_mask
+        return batch
     
-# def add_new_features(batch, max_len: int, **kwargs):
-#         processor =  Wav2Vec2Processor.from_pretrained(self.model_path, cache_dir = self.cc.CACHE_DIR)
-
-#         """Preprocessing audio features with padding to maximum lenght"""
-#         
 
 class DatasetProcessor(object):
     def __init__(self, dataset_type: str, 
-                       model_path: Union[Str, Dict],
+                       model_path: Union[str, Dict],
                        filepath: str, dataset_name: str, 
                        feature_column: str, tokenizer: Optional[Callable] = None):
-        supported_datasets = ['senteval', 'person', 'conn', 'DC', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
+        supported_datasets = ['senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
         assert dataset_type in supported_datasets, "no other types are not currently supported"
         self.dtype = dataset_type
-        self.tokenizer = tokenizer
+        self.tokenizer = tokenizer(model_path = model_path)
         self.fpath = filepath
         self.mpath = model_path
         self.dname = dataset_name
         self.feature_column = feature_column
         self.maxlen = 0 
+        self.task_data = {'train': {'data': [], self.feature_column: []},
+                        'dev': {'data': [], self.feature_column: []},
+                        'test': {'data': [], self.feature_column: []}}
     
-    def load_files(self, from_disk = False, data_col: Union[Str, List] = 'data'):
+    def load_files(self, from_disk = False, data_col: Union[str, List] = 'data'):
         raise NotImplementedError("")
     def process_dataset(self, processing_fn: Callable = None):
         raise NotImplementedError("")
 
 class NLPDatasetProcessor(DatasetProcessor): 
-    def __init__(self, dataset_type: str, model_path: Union[Str, Dict], filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Callable] = None):
+    def __init__(self, dataset_type: str, model_path: Union[str, Dict], filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Processor] = None):
         super().__init__(dataset_type, model_path, filepath, dataset_name, feature_column, tokenizer)
     def download_data(self) -> str:
-        _repr = ''
-        if self.dtype == 'senteval': pass
-        elif self.dtype == 'person' : pass
-        elif self.dtype == 'conn': pass
-        elif self.dtype == 'DC': pass
+        if self.dtype == 'senteval': 
+            assert self.fpath.endswith("tsv")
+            os.system(f"wget -O {self.fpath} https://raw.githubusercontent.com/facebookresearch/SentEval/main/data/probing/past_present.txt")
+        elif self.dtype == 'person': 
+            assert self.fpath.endswith("csv") or self.fpath.endswith("tsv")
+            os.system(f"wget -O {self.fpath} https://media.githubusercontent.com/media/morphology-probing/morph-call/main/data/morphosyntactic_values/english/person.tsv")
+        elif self.dtype == 'conn': pass     
+        elif self.dtype == 'DiscoEval': 
+            assert isinstance(self.fpath, str) and self.fpath in ['DC', 'SP']
+            os.makedirs(self.fpath, exist_ok=True)
+            os.system(f"wget -O {os.path.join(self.fpath, 'train.txt')} https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/wiki/train.txt")
+            os.system(f"wget -O {os.path.join(self.fpath, 'dev.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/wiki/valid.txt")
+            os.system(f"wget -O {os.path.join(self.fpath, 'test.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/wiki/test.txt")
+            self.load_DC_dataset(os.path.join(self.fpath, 'train.txt'), 'train')
+            self.load_DC_dataset(os.path.join(self.fpath, 'dev.txt'), 'dev')
+            self.load_DC_dataset(os.path.join(self.fpath, 'test.txt'), 'test')
         elif self.dtype == 'PDTB': pass
-        else: pass
+        else: print("nothing to download")
 
     def load_TXT_file(self):
         import io
@@ -183,156 +206,65 @@ class NLPDatasetProcessor(DatasetProcessor):
 
         labels = sorted(np.unique(self.task_data['train'][self.feature_column]))
         self.tok2label = dict(zip(labels, range(len(labels))))
-        nclasses = len(self.tok2label)
 
         for split in self.task_data:
             for i, y in enumerate(self.task_data[split][self.feature_column]):
                 self.task_data[split][self.feature_column][i] = self.tok2label[y]
 
-        def load_CSV_file(self, sep = ',', data_cols: Union[Str, List] = 'data'):
-            import io
-            self.task_data = {'train': {'data': [], self.feature_column: []},
-                                    'dev': {'data': [], self.feature_column: []},
-                                    'test': {'data': [], self.feature_column: []}}
-            tok2split = {'tr': 'train', 'va': 'dev', 'te': 'test'}
-            with csv.reader(self.fpath, 'r', delimiter = sep) as f:
-                for line in f:
-                    line = line.rstrip().split('\t') ####?????
-                    text = line[-1].split()
-                    self.maxlen = max(len(text), self.maxlen)
-
-                    self.task_data[tok2split[line[0]]]['data'].append(" ".join(text))
-                    self.task_data[tok2split[line[0]]][self.feature_column].append(line[1])
-
-            labels = sorted(np.unique(self.task_data['train'][self.feature_column]))
-            self.tok2label = dict(zip(labels, range(len(labels))))
-            nclasses = len(self.tok2label)
-
-        for split in self.task_data:
-            for i, y in enumerate(self.task_data[split][self.feature_column]):
-                self.task_data[split][self.feature_column][i] = self.tok2label[y]
-
-    def process_dataset(self, processing_fn: Callable = None, data_col: Union[Str, List] = "data"): 
-        if not os.path.exists(self.fpath): _ = self.download_data() 
-        if load_from_disk:
-            dataset = self.task_data.map(processing_fn, fn_kwargs = {'maxlen': 20, 'data_col': data_col})
-        else:
-            dataset = DatasetDict()
-            for k, v in self.task_data.items(): 
-                dataset[k] = Dataset.from_dict(v)
-                dataset[k] = dataset[k].map(processing_fn, fn_kwargs = {'maxlen': self.maxlen, 'data_col': data_col} )
-        dataset.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
-        dataset.save_to_disk(self.dname)
-
-
-def load_files(dataset, path=None):
-    senteval = ['subj_number', 'top_const', 'tree_depth']
-    if dataset in senteval:
-        data = pd.read_csv(path, sep='\t', header=None)
-        TRAIN = data[data[0] == 'tr']
-        TEST = data[data[0] == 'te']
-        X_train = TRAIN[2]
-        X_test = TEST[2]
-        y_train = TRAIN[1].values
-        y_test = TEST[1].values
-    elif dataset == 'person':
-        data = pd.read_csv(path, sep='\t')
-        TRAIN = data[data['subset']=='tr']
-        TEST = data[data['subset']=='te']
-        X_train = TRAIN['text']
-        X_test = TEST['text']
-        y_train = TRAIN['label'].values
-        y_test = TEST['label'].values
-    elif dataset == 'conn':
-        TRAIN = pd.read_csv('Conn_train.tsv', sep='\t')
-        TEST = pd.read_csv('Conn_test.tsv', sep='\t')
-        X_train = TRAIN[['sentence_1', 'sentence_2']].values.tolist()
-        X_test = TEST[['sentence_1', 'sentence_2']].values.tolist()
-        y_train = TRAIN['marker'].values
-        y_test = TEST['marker'].values
-    elif dataset == 'DC':
-        TRAIN = pd.read_csv('DC_train.csv')
-        TEST = pd.read_csv('DC_test.csv')
-        X_train = TRAIN['sentence'].apply(eval)
-        X_test = TEST['sentence'].apply(eval)
-        y_train = TRAIN['label'].values
-        y_test = TEST['label'].values
-    elif dataset == 'PDTB':
-        TRAIN = pd.read_csv('Conn_train.tsv', sep='\t')
-        TEST = pd.read_csv('Conn_test.tsv', sep='\t')
-        X_train = TRAIN[['sentence_1', 'sentence_2']].values.tolist()
-        X_test = TEST[['sentence_1', 'sentence_2']].values.tolist()
-        y_train = TRAIN['label'].values
-        y_test = TEST['label'].values
-    return X_train, y_train, X_test, y_test
-
-class ProbingDataset:
-    """Class to feel nlp probing tasks
-    """
-    def __init__(self, model_path: str, filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Callable]):
-        self.fpath = filepath
-        self.dname = dataset_name
-        self.feature_column = feature_column
-        self.tokenizer = BertTokenizer.from_pretrained(Constants.MODELS_PATH[model_path]["None"])
-        self.maxlen = 0 
-
-    def loadCSV(self, sep: str = ","):
-        pass
-
-    def loadCustomFile(self, preprocessing_fn: Callable):
-        pass
-
-    def loadHuggingFaceDataset(self):
-        self.task_data = load_from_disk(dataset_path = self.fpath)
-
-
-    def loadFile(self):
-        import io
+    def load_CSV_file(self, sep = ',', data_col: Union[str, List] = 'data', header: int = None):
         self.task_data = {'train': {'data': [], self.feature_column: []},
-                              'dev': {'data': [], self.feature_column: []},
-                              'test': {'data': [], self.feature_column: []}}
+                                'dev': {'data': [], self.feature_column: []},
+                                'test': {'data': [], self.feature_column: []}}
         tok2split = {'tr': 'train', 'va': 'dev', 'te': 'test'}
-        with io.open(self.fpath, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.rstrip().split('\t')
-                text = line[-1].split()
-                self.maxlen = max(len(text), self.maxlen)
+        tmp_data = pd.read_csv(self.fpath, sep = sep, header = header)
 
-                self.task_data[tok2split[line[0]]]['data'].append(" ".join(text))
-                self.task_data[tok2split[line[0]]][self.feature_column].append(line[1])
+        for abbr, split in tok2split.items(): 
+            self.task_data[split] = tmp_data[tmp_data["subset"] == abbr][[data_col, self.feature_column]]
+        
+        self.maxlen = self.task_data["train"][data_col].map(lambda x: x.split(" ")).map(len).max() 
 
         labels = sorted(np.unique(self.task_data['train'][self.feature_column]))
         self.tok2label = dict(zip(labels, range(len(labels))))
-        nclasses = len(self.tok2label)
 
         for split in self.task_data:
-            for i, y in enumerate(self.task_data[split][self.feature_column]):
-                self.task_data[split][self.feature_column][i] = self.tok2label[y]
-    
-    def make_dataset(self, from_disk = False, data_col: str = 'data') -> Any[Dataset, DatasetDict]:
-        ###TODO: ADD SUPPORT OF OTHER DATASET TYPES, DOCSTRINGS
-        if from_disk: self.loadHuggingFaceDataset()
-        else: self.loadFile()
+            for i, y in enumerate(self.task_data[split][self.feature_column].values):
+                self.task_data[split][self.feature_column].values[i] = self.tok2label[y]
 
-        def mapping_fn(batch, maxlen: int, data_col: str = 'data'):
-            """BERT preprocessing
-            """
-            inputs = self.tokenizer(batch[data_col], return_tensors = 'pt',  
-                                    max_length = maxlen, truncation = True, padding = 'max_length')
-            batch['input_values'] = inputs.input_ids
-            batch['attention_mask'] = inputs.attention_mask
-            batch['label'] = int(batch[self.feature_column])
-            return batch
+    
+    def load_DC_dataset(self, path: str, _split: str):
+        import io
+        with io.open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.rstrip().split('\t')
+                text = line[-1].split()
+                if _split == "train": self.maxlen = max(len(text), self.maxlen)
+                self.task_data[_split]['data'].append(" ".join(text))
+                self.task_data[_split][self.feature_column].append(line[0])
+        
+        if _split == "train": 
+            labels = sorted(np.unique(self.task_data[_split][self.feature_column]))
+            self.tok2label = dict(zip(labels, range(len(labels))))
+        for i, y in enumerate(self.task_data[_split][self.feature_column]):
+            self.task_data[_split][self.feature_column][i] = self.tok2label[y]
+    
+    def loadHuggingFaceDataset(self, from_disk: bool = True):
+        if from_disk: self.task_data = load_from_disk(dataset_path = self.fpath)
+        else: self.task_data = load_dataset(path = self.dname)
+
+
+    def process_dataset(self, data_col: Union[str, List] = "data", load_from_disk = False): 
+        if not os.path.exists(self.fpath): _ = self.download_data() 
         if load_from_disk:
-            dataset = self.task_data.map(mapping_fn, fn_kwargs = {'maxlen': 20, 'data_col': data_col})
+            self.task_data = self.loadHuggingFaceDataset(from_disk = load_from_disk)
+            dataset = self.task_data.map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col})
         else:
             dataset = DatasetDict()
             for k, v in self.task_data.items(): 
                 dataset[k] = Dataset.from_dict(v)
-                dataset[k] = dataset[k].map(mapping_fn, fn_kwargs = {'maxlen': self.maxlen, 'data_col': data_col} )
+                dataset[k] = dataset[k].map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col} )
         dataset.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
         dataset.save_to_disk(self.dname)
-        return dataset
+
 
 def make_dataset() -> DatasetDict:
     lingusitic_dataset = DatasetDict()

@@ -87,6 +87,7 @@ class CheckPointer:
         cc = Constants
         assert isinstance(parent_dir, str)
         self.parent_dir = os.path.join(parent_dir, "checkpoints", str(cc.TODAY))
+        if not os.path.exists(self.parent_dir): os.makedirs(self.parent_dir, exist_ok = True)
 
     def __call__(self, probing_model: torch.nn.Module, task_title: str,
                        params: dict, layer_idx: int, optimizer: torch.optim):

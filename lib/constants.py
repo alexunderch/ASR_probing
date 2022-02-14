@@ -15,6 +15,7 @@ class Constants:
                                 "es": "facebook/wav2vec2-large-xlsr-53-spanish"},
                 "timit_asr": {"None": "elgeish/wav2vec2-large-lv60-timit-asr"},
                 "bert": {"None": "bert-large-cased"},
+                "t5": {"None": "t5-small"},
                 "roberta": {"None": "roberta-large-cased"}
                 }
 

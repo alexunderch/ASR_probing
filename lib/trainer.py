@@ -134,8 +134,8 @@ class Trainer():
         self.model.eval()
         self.logger.log_string(f"validating...")
         with self.profiler.profile('validation') as prof:
-            valid_loss, valid_metrics = self.valid_epoch(valid_loader, batch_processing_fn, prof, metrics)
-            self._clear_cache()
+            valid_loss, valid_metrics = self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics)
+        self._clear_cache()
         return valid_loss, valid_metrics
                         
 

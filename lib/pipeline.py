@@ -14,7 +14,7 @@ from .constants import Constants
 
 def _make_directory_structure():
     cc =Constants
-    if not os.path.exists(cc.GRAPHS_PATH): os.makedirs(os.path.join(cc.GRAPHS_PATH, cc.TODAY))
+    if not os.path.exists(cc.GRAPHS_PATH) or not os.path.exists(os.path.join(cc.GRAPHS_PATH, cc.TODAY)): os.makedirs(os.path.join(cc.GRAPHS_PATH, cc.TODAY))
     if not os.path.exists(cc.LOGGING_DIR): os.makedirs(cc.LOGGING_DIR)
     if not os.path.exists(cc.PROFILING_DIR) and cc.PROFILING: os.makedirs(cc.PROFILING_DIR)
 
@@ -174,7 +174,7 @@ class Probing_pipeline:
        
 
         probing_results = probing_task.make_probe(probing_fn, use_variational = use_variational, enable_grads = enable_grads, layers = layers, 
-                                                  save_outputs = save_checkpoints, task_title = plotting_config['title'])
+                                                  save_outputs = save_checkpoints, task_title = plotting_config)
         
         json.dump({"data": probing_results, "config": plotting_config}, 
                   open(os.path.join(plotting_config['save_path'], plotting_config['title'] + ".json"), 'w' ), cls = NumpyEncoder)
