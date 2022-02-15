@@ -1,5 +1,5 @@
-#NLP probing algorithm
-##For "hard-coded" datasets
+# NLP probing algorithm
+## For "hard-coded" datasets
 The full pipepline of working with these datasets consists of 2 great stages: dataset processing and running a chosen task which are combined in `SimpleNLPPipeline`.
 You also feel free to use own beautiful pipelines.
 
