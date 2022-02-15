@@ -1,5 +1,5 @@
 from transformers import BertTokenizer, Wav2Vec2Processor, T5Tokenizer
-from base.processing import Processor
+from .base.processing import Processor
 
 class BertProcessor(Processor):
     def __init__(self, model_path) -> None:

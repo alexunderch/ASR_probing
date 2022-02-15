@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from  IPython.display import clear_output
 
-from base.constants import Constants
+from .base.constants import Constants
 from sklearn.linear_model import SGDClassifier, LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, accuracy_score, classification_report

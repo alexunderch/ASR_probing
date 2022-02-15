@@ -1,5 +1,7 @@
-from base.utils import NumpyEncoder, print_if_debug
-from base.prober import Prober
+from .base.utils import NumpyEncoder, print_if_debug
+from .base.constants import Constants
+
+from .base.prober import Prober
 import torch
 from datasets import load_dataset, load_from_disk
 from transformers import logging as log_models
@@ -10,14 +12,6 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import Callable
-from base.constants import Constants
-
-def _make_directory_structure():
-    cc =Constants
-    if not os.path.exists(cc.GRAPHS_PATH) or not os.path.exists(os.path.join(cc.GRAPHS_PATH, cc.TODAY)): os.makedirs(os.path.join(cc.GRAPHS_PATH, cc.TODAY))
-    if not os.path.exists(cc.LOGGING_DIR): os.makedirs(cc.LOGGING_DIR)
-    if not os.path.exists(cc.PROFILING_DIR) and cc.PROFILING: os.makedirs(cc.PROFILING_DIR)
-
 class Probing_pipeline:
     def __init__(self, writer: torch.utils.tensorboard.SummaryWriter, device: torch.device,
                  feature: str, model_path: str, data: Dataset = None, lang: str = None, split: str = None) -> None:

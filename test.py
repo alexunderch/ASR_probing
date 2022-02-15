@@ -1,16 +1,16 @@
 from collections import Callable
-import imp
 import os
 import torch
 from torch.utils import tensorboard
 
-from lib.constants import Constants
-from lib.func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2, _lang
-from lib.clf import ProberModel
-from lib.probers import Prober, BertOProber, Wav2Vec2Prober
-from lib.constants import Constants
-from lib.pipeline import Probing_pipeline, _make_directory_structure
+from lib.base.constants import Constants
+from lib.func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2
+from lib.base.utils import _lang, _make_directory_structure
+from lib.base.clf import ProberModel
+from lib.probers import Prober, BertOProber, Wav2Vec2Prober, T5Prober
+from lib.pipeline import Probing_pipeline
 from IPython.display import clear_output
+from lib.tokenizers import Wav2Vec2OProcessor
 class TaskTester:
     def __init__(self, model2probe: Prober,
                        dataset_name: str,
@@ -90,7 +90,9 @@ class TaskTester:
                     pipe.load_data(from_disk = from_disk, data_path = dataset_name if not from_disk else prefix_data_path,
                                    own_feature_set = own_feature_set, only_custom_features = False)
                     if model2probe == Wav2Vec2Prober:
-                        print(pipe.preprocess_data(preprocessing_fn, save_path = save_preprocessed_data,
+                        print(pipe.preprocess_data(preprocessing_fn = preprocessing_fn, 
+                                                  feature_processing_fn = Wav2Vec2OProcessor(cc.MODELS_PATH[dataset_name][str(lang)]), 
+                                                  save_path = save_preprocessed_data,
                                                   target_processing = None, **kwargs))
                     print("The task title:", title)
                     res = pipe.run_probing(model2probe, probing_fn, layers = layers, enable_grads = enable_grads, 
@@ -121,28 +123,27 @@ class TaskTester:
 def main():
     import numpy as np
     layers = list(np.arange(1, 24, 1))
-    TaskTester(dataset_name = "bert",
-            model2probe = BertOProber,
-            features = ['tense'],
+    
+    TaskTester(dataset_name = "timit_asr",
+            model2probe = Wav2Vec2Prober,
+            features = ['sex'],
             layers = layers,
-            prefix_data_path='./tense_set/',
-            preprocessing_fn = None,
+            preprocessing_fn = prepare_probing_task_timit_2,
             use_variational = False,
-            enable_grads = False,
+            enable_grads = True,
             save_checkpoints = False,
             probing_fn = ProberModel,
-            from_disk=True)
+            from_disk=False)
 
-    TaskTester(dataset_name = "bert",
-            model2probe = BertOProber,
-            features = ['tense'],
+    TaskTester(dataset_name = "timit_asr",
+            model2probe = Wav2Vec2Prober,
+            features = ['sex'],
             layers = layers,
-            prefix_data_path='./tense_set/',
-            preprocessing_fn = None,
+            preprocessing_fn = prepare_probing_task_timit_2,
             use_variational = True,
-            enable_grads = False,
+            enable_grads = True,
             save_checkpoints = False,
             probing_fn = ProberModel,
-            from_disk=True)
+            from_disk=False)
 
 if __name__ == "__main__": main()

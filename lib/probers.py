@@ -3,12 +3,12 @@ from typing import Dict, Union
 import torch
 from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration
 from datasets import Dataset
-from base.utils import print_if_debug
-from base.constants import Constants
-from base.trainer import Trainer, F1Score
-from base.clf import LinearModel, Loss
+from .base.utils import print_if_debug
+from .base.constants import Constants
+from .base.trainer import Trainer, F1Score
+from .base.clf import LinearModel, Loss
 
-from base.prober import Prober
+from .base.prober import Prober
 import os
 import numpy as np
 from tqdm import tqdm

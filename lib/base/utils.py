@@ -8,6 +8,8 @@ import nltk
 nltk.download('averaged_perceptron_tagger')
 import numpy as np
 import json
+import os
+from .constants import Constants
 
 def remove_special_characters(batch):
     chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
@@ -35,3 +37,9 @@ class NumpyEncoder(json.JSONEncoder):
         elif isinstance(obj, np.floating): return float(obj)
         elif isinstance(obj, np.ndarray): return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+def _make_directory_structure():
+    cc =Constants
+    if not os.path.exists(cc.GRAPHS_PATH) or not os.path.exists(os.path.join(cc.GRAPHS_PATH, cc.TODAY)): os.makedirs(os.path.join(cc.GRAPHS_PATH, cc.TODAY))
+    if not os.path.exists(cc.LOGGING_DIR): os.makedirs(cc.LOGGING_DIR)
+    if not os.path.exists(cc.PROFILING_DIR) and cc.PROFILING: os.makedirs(cc.PROFILING_DIR)
