@@ -83,7 +83,7 @@ class Prober:
             self.data = self.data.map(poison_data, fn_kwargs = {"n_classes": np.max(self.data['label']),
                                                                                     'ratio': poisoning_ratio,
                                                                                      'mapping': poisoning_mapping})
-        print(self.data['label'][:5])
+
             
         self.data.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
 

@@ -99,18 +99,18 @@ class NLPDatasetProcessor(DatasetProcessor):
         super().__init__(dataset_type, model_path, filepath, dataset_name, feature_column, tokenizer)
     def download_data(self) -> str:
         if self.dtype == 'senteval': 
-            assert self.fpath.endswith("tsv")
-            os.system(f"wget -O {self.fpath} https://raw.githubusercontent.com/facebookresearch/SentEval/main/data/probing/past_present.txt")
+            assert self.fpath.endswith("txt")
+            os.system(f"wget -O {self.fpath} https://raw.githubusercontent.com/facebookresearch/SentEval/main/data/probing/{self.fpath}")
         elif self.dtype == 'person': 
             assert self.fpath.endswith("csv") or self.fpath.endswith("tsv")
             os.system(f"wget -O {self.fpath} https://media.githubusercontent.com/media/morphology-probing/morph-call/main/data/morphosyntactic_values/english/person.tsv")
         elif self.dtype == 'conn': pass     
         elif self.dtype == 'DiscoEval': 
-            assert isinstance(self.fpath, str) and self.fpath in ['DC', 'SP']
+            assert isinstance(self.fpath, str) and self.fpath in ['DC', 'SP', 'PDTB']
             os.makedirs(self.fpath, exist_ok=True)
-            os.system(f"wget -O {os.path.join(self.fpath, 'train.txt')} https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/wiki/train.txt")
-            os.system(f"wget -O {os.path.join(self.fpath, 'dev.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/wiki/valid.txt")
-            os.system(f"wget -O {os.path.join(self.fpath, 'test.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/wiki/test.txt")
+            os.system(f"wget -O {os.path.join(self.fpath, 'train.txt')} https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + "Explicit" if self.path == 'PDTB' else "wiki" + "/train.txt")
+            os.system(f"wget -O {os.path.join(self.fpath, 'dev.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + "Explicit" if self.path == 'PDTB' else "wiki" + "/valid.txt")
+            os.system(f"wget -O {os.path.join(self.fpath, 'test.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + "Explicit" if self.path == 'PDTB' else "wiki" + "/test.txt")
             self.load_DC_dataset(os.path.join(self.fpath, 'train.txt'), 'train')
             self.load_DC_dataset(os.path.join(self.fpath, 'dev.txt'), 'dev')
             self.load_DC_dataset(os.path.join(self.fpath, 'test.txt'), 'test')

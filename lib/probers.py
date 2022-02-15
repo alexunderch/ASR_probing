@@ -1,7 +1,7 @@
 from ast import Str
 from typing import Dict, Union
 import torch
-from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration
+from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration, T5EncoderModel
 from datasets import Dataset
 from .base.utils import print_if_debug
 from .base.constants import Constants
@@ -208,7 +208,7 @@ class Wav2Vec2Prober(Prober):
 class T5Prober(Prober):
     def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
 
-        super().__init__(T5ForConditionalGeneration, model_path, writer, data, device, init_strategy)
+        super().__init__(T5EncoderModel, model_path, writer, data, device, init_strategy)
         self.model.config.is_decoder = False
 
         if init_strategy is not None:
@@ -233,7 +233,6 @@ class T5Prober(Prober):
 
     def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.fixed_encoder = self.model.encoder.block.cpu()
-        self.model.lm_head = torch.nn.Identity(512)
 
         assert np.alltrue([l > 0 and l < len(self.fixed_encoder) for l in layers])
 
