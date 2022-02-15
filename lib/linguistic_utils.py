@@ -1,7 +1,7 @@
 from typing import Union,  Dict
-from base.constants import Constants
-from base.utils import print_if_debug, label_batch
-from base.processing import Processor, DatasetProcessor
+from .base.constants import Constants
+from .base.utils import print_if_debug, label_batch
+from .base.processing import Processor, DatasetProcessor
 
 
 from torchaudio import load, transforms
