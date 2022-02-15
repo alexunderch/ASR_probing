@@ -1,7 +1,7 @@
 from typing import Union,  Dict
-from .base.constants import Constants
-from .base.utils import print_if_debug, label_batch
-from .base.processing import Processor, DatasetProcessor
+from base.constants import Constants
+from base.utils import print_if_debug, label_batch
+from base.processing import Processor, DatasetProcessor
 
 
 from torchaudio import load, transforms
@@ -97,27 +97,35 @@ class LinguisticDataset:
 class NLPDatasetProcessor(DatasetProcessor): 
     def __init__(self, dataset_type: str, model_path: Union[str, Dict], filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Processor] = None):
         super().__init__(dataset_type, model_path, filepath, dataset_name, feature_column, tokenizer)
-    def download_data(self) -> str:
+    def download_data(self, download: bool = True) -> str:
+        """Args:
+            download, bool: whether to download data
+                            default = True 
+        """
         if self.dtype == 'senteval': 
             assert self.fpath.endswith("txt")
-            os.system(f"wget -O {self.fpath} https://raw.githubusercontent.com/facebookresearch/SentEval/main/data/probing/{self.fpath}")
+            if download: os.system(f"wget -O {self.fpath} https://raw.githubusercontent.com/facebookresearch/SentEval/main/data/probing/{self.fpath}")
+            self.load_TXT_file()
         elif self.dtype == 'person': 
             assert self.fpath.endswith("csv") or self.fpath.endswith("tsv")
-            os.system(f"wget -O {self.fpath} https://media.githubusercontent.com/media/morphology-probing/morph-call/main/data/morphosyntactic_values/english/person.tsv")
+            if download: os.system(f"wget -O {self.fpath} https://media.githubusercontent.com/media/morphology-probing/morph-call/main/data/morphosyntactic_values/english/person.tsv")
+            self.load_CSV_file(sep = '\t', data_col = 'text', header = 0)
         elif self.dtype == 'conn': pass     
         elif self.dtype == 'DiscoEval': 
             assert isinstance(self.fpath, str) and self.fpath in ['DC', 'SP', 'PDTB']
-            os.makedirs(self.fpath, exist_ok=True)
-            os.system(f"wget -O {os.path.join(self.fpath, 'train.txt')} https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + "Explicit" if self.path == 'PDTB' else "wiki" + "/train.txt")
-            os.system(f"wget -O {os.path.join(self.fpath, 'dev.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + "Explicit" if self.path == 'PDTB' else "wiki" + "/valid.txt")
-            os.system(f"wget -O {os.path.join(self.fpath, 'test.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + "Explicit" if self.path == 'PDTB' else "wiki" + "/test.txt")
+            if download:
+                os.makedirs(self.fpath, exist_ok=True)
+                os.system(f"wget -O {os.path.join(self.fpath, 'train.txt')} https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/train.txt")
+                os.system(f"wget -O {os.path.join(self.fpath, 'dev.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/valid.txt")
+                os.system(f"wget -O {os.path.join(self.fpath, 'test.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/test.txt")
             self.load_DC_dataset(os.path.join(self.fpath, 'train.txt'), 'train')
             self.load_DC_dataset(os.path.join(self.fpath, 'dev.txt'), 'dev')
             self.load_DC_dataset(os.path.join(self.fpath, 'test.txt'), 'test')
         elif self.dtype == 'PDTB': pass
         else: print("nothing to download")
 
-    def load_TXT_file(self):
+    def load_TXT_file(self) -> None:
+        """Loading the .txt senteval files line by line"""
         import io
         self.task_data = {'train': {'data': [], self.feature_column: []},
                               'dev': {'data': [], self.feature_column: []},
@@ -139,7 +147,9 @@ class NLPDatasetProcessor(DatasetProcessor):
             for i, y in enumerate(self.task_data[split][self.feature_column]):
                 self.task_data[split][self.feature_column][i] = self.tok2label[y]
 
-    def load_CSV_file(self, sep = ',', data_col: Union[str, List] = 'data', header: int = None):
+    def load_CSV_file(self, sep = ',', data_col: Union[str, List] = 'data', header: int = None) -> None:
+        """Loading the .csv/tsv files line by line"""
+
         self.task_data = {'train': {'data': [], self.feature_column: []},
                                 'dev': {'data': [], self.feature_column: []},
                                 'test': {'data': [], self.feature_column: []}}
@@ -158,8 +168,10 @@ class NLPDatasetProcessor(DatasetProcessor):
             for i, y in enumerate(self.task_data[split][self.feature_column].values):
                 self.task_data[split][self.feature_column].values[i] = self.tok2label[y]
 
-    
-    def load_DC_dataset(self, path: str, _split: str):
+    def load_Own_Format(self, *args, **kwargs) -> None:
+        raise NotImplementedError("")
+
+    def load_DC_dataset(self, path: str, _split: str) -> None:
         import io
         with io.open(path, 'r', encoding='utf-8') as f:
             for line in f:
@@ -175,7 +187,7 @@ class NLPDatasetProcessor(DatasetProcessor):
         for i, y in enumerate(self.task_data[_split][self.feature_column]):
             self.task_data[_split][self.feature_column][i] = self.tok2label[y]
     
-    def loadHuggingFaceDataset(self, from_disk: bool = True):
+    def loadHuggingFaceDataset(self, from_disk: bool = True) -> None:
         if from_disk: self.task_data = load_from_disk(dataset_path = self.fpath)
         else: self.task_data = load_dataset(path = self.dname)
 
@@ -194,7 +206,7 @@ class NLPDatasetProcessor(DatasetProcessor):
         dataset.save_to_disk(self.dname)
 
 
-def make_dataset() -> DatasetDict:
+def _make_linguistic_dataset_for_wav2vec2() -> DatasetDict:
     lingusitic_dataset = DatasetDict()
     for mode in modes:
         lingusitic_dataset[mode] = LinguisticDataset(mode, 
@@ -203,3 +215,13 @@ def make_dataset() -> DatasetDict:
                                                     debug = Constants.DEBUG,
                                                     take_n = None if mode == 'word_detail' else 15000 )
     return lingusitic_dataset
+
+def make_nlp_dataset(dataset_type: str,  model_path:str, filepath: str, dataset_name: str, 
+                feature_column: str, tokenizer: Processor, download: bool = True, data_column: str = "data") -> None: 
+    data_proc = NLPDatasetProcessor(dataset_type = dataset_type, model_path = model_path, filepath = filepath, 
+                                    dataset_name = dataset_name, feature_column = feature_column, tokenizer = tokenizer)
+
+    data_proc.download_data(download = download)
+
+    data_proc.process_dataset(data_col = data_column)
+    
