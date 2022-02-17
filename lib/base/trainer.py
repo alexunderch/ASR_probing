@@ -122,9 +122,10 @@ class Trainer():
             inputs, attention_masks, labels = batch_processing_fn(batch)
             output = self.model(inputs, attention_masks)
             batch_loss = self.loss_function(labels, output, self.model.clf)
-            valid_loss.append(batch_loss)
+            valid_loss.append(batch_loss.detach().cpu().item())
             valid_metrics.append(metrics(output.detach().cpu(), labels.detach().cpu()))
             prof.step()
+            
         return np.mean(valid_loss), np.mean(valid_metrics)
     
 
