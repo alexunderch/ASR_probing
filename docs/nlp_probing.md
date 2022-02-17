@@ -16,19 +16,19 @@ Dataset preprocessing parameters:
 - `filepath` (`str`): a filepath to downloaded dataset files (for 'senteval' it should be like filename.txt); 
 Note: for 'DiscoEval' is should be ('DC', 'SP', 'PDTB') -- the name of used set.
 - `dataset_name`(`str`): a name the dataset should be saved under.
-- `feature_column` (`str`):
-- `tokenizer` (`lib.base.Processor`):
-- `download` (`bool`):
-- `data_column` (`str`):
+- `feature_column` (`str`): a column which should be probe on (should be in the probing dataset)
+- `tokenizer` (`lib.base.Processor`): a tokenizer class. 
+- `download` (`bool`): whether to use proper the first time or not (default = True)
+- `data_column` (`str`): a column with text to tokenize (defult = 'data', actual only for CSV/TSV files)
 Dataset preprocessing parameters:
-- `model_path` (`str`):
-- `checkpoint_path` (`str`):         
-- `model_init_strategies` (`list`): = [None] + ["full"], 
-- `use_variational` (`bool`): = False,
-- `device` (`torch.device`): = torch.device('cpu'), 
-- `probing_fn` (`torch.nn.Module`): = ProberModel,
-- `enable_grads`(`bool`): = False,
-- `save_checkpoints` (`bool`): = False, 
-- `save_preprocessed_data` (`str`): = None,
-- `return_results` (`bool`): = False,
+- `model_path` (`str`): a name of model to use ('bert', 't5' for nlp tasks)
+- `checkpoint_path` (`str`): a path to checkpoint (default = None)        
+- `model_init_strategies` (`list`): a list of model initialized stategies (default =  [None] + ["full"])
+- `use_mdl` (`bool`): use MDL (variational approach) or not (default = False)
+- `device` (`torch.device`): device to probe on (default = torch.device('cpu')) 
+- `probing_fn` (`torch.nn.Module`): a class of prbong classier (default = ProberModel)
+- `enable_grads`(`bool`): a flag backprop through or not (default = False)
+- `save_checkpoints` (`bool`): save checkpoints for each layer or not (default = False) 
+- `return_results` (`bool`): (default = False)
+
 
