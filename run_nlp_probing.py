@@ -26,11 +26,10 @@ def main():
                        download_data: bool = True,
                        dataset_language: list = [None],
                        dataset_split: str = "test",
-                       from_disk: bool = False,
                        data_path: str = None,
                        checkpoint_path: str = None,
                        model_init_strategies: list = [None] + ["full"], 
-                       use_variational: bool = False,
+                       use_mdl: bool = False,
                        device: torch.device = torch.device('cpu'), 
                        probing_fn: torch.nn.Module = ProberModel,
                        enable_grads = False,
@@ -43,7 +42,7 @@ def main():
                                     dataset_name = dataset_name, feature_column = feature, tokenizer = tokenizer)
             data_proc.download_data(download = download_data)
 
-            data_proc.process_dataset(data_col = data_column, load_from_disk = from_disk)           
+            data_proc.process_dataset(data_col = data_column, load_from_disk = not download_data)           
             self.results = []
             layers = list(sorted(layers))
 
@@ -59,13 +58,13 @@ def main():
                                             lang = lang, split = dataset_split)
                     pipe.disable_cache()
                     if from_disk: assert isinstance(data_path, str)
-                    pipe.load_data(from_disk = from_disk, data_path = dataset_name if not from_disk else data_path,
-                                own_feature_set = None, only_custom_features = False)
+                    pipe.load_data(from_disk = from_disk, data_path = dataset_name if download_data else data_path,
+                                own_feature_set = data_proc.tok2label, only_custom_features = False)
                     
                     print("The task title:", title)
                     res = pipe.run_probing(model2probe, probing_fn, layers = layers, enable_grads = enable_grads, 
-                                        use_variational = use_variational, 
-                                        plotting_fn = plotting_fn, 
+                                        use_variational = use_mdl, 
+                                        plotting_fn = None, 
                                         save_checkpoints = save_checkpoints, 
                                         init_strategy = init_strategy, 
                                         plotting_config = {"title": title,
