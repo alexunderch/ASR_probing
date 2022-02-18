@@ -1,6 +1,11 @@
 # ASR_probing
 A framework for ASR probing using MDL approach
-
+## Installation
+```bash
+git clone https://github.com/alexunderch/ASR_probing.git
+cd ASR_probing
+pip install -r requirements.txt
+```
 ## The first thing to know
 The main object of the framework is the `Probing_pipeline` class instance:
 ```
