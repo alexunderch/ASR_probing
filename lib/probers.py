@@ -80,12 +80,9 @@ class BertOProber(Prober):
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]))            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
             probing_info['loss'].append(valid_loss)
-            probing_info['metrics'].append(valid_metrics)
-
-            self.writer.add_scalar("test loss", valid_loss, layer)
-            self.writer.add_scalar("test f1", valid_metrics, layer)    
+            probing_info['metrics'].append(valid_metrics) 
             
             probing_model = probing_model.cpu()
             del probing_model
@@ -193,7 +190,7 @@ class Wav2Vec2Prober(Prober):
                 
                 self._clear_cache()
                 print_if_debug("validating...", self.cc.DEBUG)
-                valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]))            
+                valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
                 probing_info['loss'].append(valid_loss)
                 probing_info['metrics'].append(valid_metrics)
 
@@ -287,7 +284,7 @@ class T5Prober(Prober):
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]))            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
             probing_info['loss'].append(valid_loss)
             probing_info['metrics'].append(valid_metrics)   
 

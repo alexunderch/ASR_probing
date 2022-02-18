@@ -1,3 +1,4 @@
+from typing import Dict, Union
 from .base.utils import NumpyEncoder, print_if_debug
 from .base.constants import Constants
 
@@ -148,11 +149,13 @@ class Probing_pipeline:
         print('done')
         return self
     
-    def run_probing(self, probing_taskk: Prober, probing_fn, layers: list, checkpoint_path: str = None, enable_grads = False, use_variational: bool = False, init_strategy: str = None, plotting_fn: Callable = None, 
+    def run_probing(self, probing_taskk: Prober, probing_fn, layers: list, checkpoint_path: Union[str, Dict] = None, enable_grads = False, use_variational: bool = False, init_strategy: str = None, plotting_fn: Callable = None, 
                     save_checkpoints: bool = False, plotting_config: dict = None, **kwargs) -> dict:
         """Main probing runner
         Args:
            probing_fn, init_strategy -- look at Prober docs
+           checkpoint_path: str or dict: a path to pretrained model checkpoint or model state dict itself
+                                         default = None
            use_variational, bool: optional flag, whether to use variational prober or not
                                   default = False
            enable_grads, bool: optional flag, whether to propagate grads or not

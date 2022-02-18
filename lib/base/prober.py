@@ -9,6 +9,7 @@ import os
 import gc
 import numpy as np
 from collections import Callable
+from typing import Dict, Union
 
 
 class Prober:
@@ -44,7 +45,7 @@ class Prober:
         self.profiler.on() if self.cc.PROFILING else self.profiler.off() 
         self.profiler.profile()
 
-    def get_resources(self, load_data: bool = False, data_path: str = None, checkpoint_path: str = None, batch_size: int = 100, 
+    def get_resources(self, load_data: bool = False, data_path: str = None, checkpoint_path: Union[str, Dict] = None, batch_size: int = 100, 
                       poisoning_ratio: float = 0, poisoning_mapping: Callable = None, **kwargs) -> None:
         """
         Args:
@@ -52,7 +53,7 @@ class Prober:
                            default = False
           data_path, str: optional, active only if load_data = True;
                           default = None
-          checkpoint_path, str: a path to pretrained model checkpoint
+          checkpoint_path, str: a path to pretrained model checkpoint or model state dict itself
                                 default = None
           batch_size, int: optional;
                            default = 100
@@ -72,8 +73,11 @@ class Prober:
             return batch        
 
         if checkpoint_path is not None:
-            assert isinstance(checkpoint_path, str) and os.path.exists(checkpoint_path)
-            self.model.load_state_dict(checkpoint_path)
+            if isinstance(checkpoint_path, str) and os.path.exists(checkpoint_path):
+                ckpt = torch.load(checkpoint_path, map_location = self.device)
+                self.model.load_state_dict(ckpt)
+            elif isinstance(checkpoint_path, dict):  self.model.load_state_dict(checkpoint_path)
+            else: print("Nothing has been loaded")
         
         if load_data: 
             assert isinstance(data_path, str)

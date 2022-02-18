@@ -2,6 +2,7 @@
 
 from typing import Callable, List, Any, Tuple, Union
 import torch
+import torch.utils.tensorboard
 from tqdm import tqdm
 import numpy as np
 from .profilers import MyLogger, ProbingProfiler
@@ -51,7 +52,7 @@ class Trainer():
         device, torch.device: a training device
         callback: an initialized object of callback class 
       """
-      self.model =  model
+      self.model =  model.to(device)
       self.loss_function = loss_function
       self.optimizer = optimizer(self.model.parameters(), lr = lr)
       self.scheduler = scheduler(self.optimizer, T_max = 10)
@@ -139,6 +140,7 @@ class Trainer():
             info, dict: some auxillary info
         Returns: self
         """
+        self.model = self.model.to(self.device)
         self.model.train()
         iterations = tqdm(range(count_of_epoch), desc = 'epoch')
         iterations.set_postfix({'train epoch loss': np.nan})
@@ -156,19 +158,24 @@ class Trainer():
 
 
     @torch.no_grad()
-    def validate(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, metrics: Callable) -> Tuple:
+    def validate(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, metrics: Callable, info: dict) -> Tuple:
         """Args:
             valid_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
             metrics, callable: own callable metrics
+            info, dict: some auxillary info
         Returns: 
             valid_loss: float, value of loss_fn on the batch of data
             valid_metrics: float, value of metrics_fn on the batch of data
         """
+        self.model = self.model.to(self.device)
         self.model.eval()
         self.logger.log_string(f"validating...")
         with self.profiler.profile('validation') as prof:
             valid_loss, valid_metrics = self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics)
+            self.writer.add_scalar("valid loss", valid_loss, info['layer'])
+            self.writer.add_scalar(f"valid {metrics.name}", valid_metrics, info['layer'])
+
         self._clear_cache()
         return valid_loss, valid_metrics
                         
