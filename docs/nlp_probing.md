@@ -48,7 +48,7 @@ Examples of usage:
     
     SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "bert", model_path = None,
                        dataset_type = "senteval",  save_checkpoints = False, dataset_split = 'train',
-                       feature = 'label', layers = list(np.arange(1, 5, 1)), 
+                       feature = 'label', layers = list(np.arange(1, 5, 1)), use_mdl = True,
                        tokenizer= BertProcessor, data_path= "past_present.txt", 
                        device = torch.device('cuda'), data_column = "data")
   ```
