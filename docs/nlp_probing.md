@@ -52,3 +52,14 @@ Examples of usage:
                        tokenizer= BertProcessor, data_path= "past_present.txt", 
                        device = torch.device('cuda'), data_column = "data")
   ```
+## For own-formatted datasets (TBD)
+
+## Plotting results
+```python
+    from plott import plot
+    """
+    U need 4 experiments: with init strategies None and "full" and with use_mdl = False, True to plot.
+    """
+    plot(x = layers used in pipeline, experiment_date = 'yyyy-mm-dd', 
+         dataset='dataset name used in pipeline', feature = 'label', lang="en", grads='enabled grads in pipeline')
+```
