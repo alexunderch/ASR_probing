@@ -31,4 +31,24 @@ Dataset preprocessing parameters:
 - `save_checkpoints` (`bool`): save checkpoints for each layer or not (default = False) 
 - `return_results` (`bool`): (default = False)
 
+Examples of usage:
+  ```python
+    SimpleNLPPipeline(model2probe = T5Prober, dataset_name = "t5", ##important!!!!
+                       model_path = None,
+                       dataset_type = "person",  save_checkpoints = True, download_data = True,
+                       checkpoint_path = torch.load("t5small.pth").state_dict(),
+                       feature = 'label', layers = list(np.arange(1, 5, 1)), 
+                       tokenizer= T5Processor, data_path= "person.tsv", device = torch.device('cuda'), data_column = "text")
 
+    SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "lovethisdataset2", model_path = 'bert-base-cased',
+                       dataset_type = "DiscoEval",  save_checkpoints = False, 
+                       feature = 'label', layers = list(np.arange(1, 5, 1)), 
+                       tokenizer= BertProcessor, data_path= "SP", device = torch.device('cuda'), data_column = "data")
+
+    
+    SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "bert", model_path = None,
+                       dataset_type = "senteval",  save_checkpoints = False, dataset_split = 'train',
+                       feature = 'label', layers = list(np.arange(1, 5, 1)), 
+                       tokenizer= BertProcessor, data_path= "past_present.txt", 
+                       device = torch.device('cuda'), data_column = "data")
+  ```
