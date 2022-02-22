@@ -7,7 +7,7 @@ from lib.base.constants import Constants
 from lib.func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2
 from lib.base.utils import _lang, _make_directory_structure
 from lib.base.clf import ProberModel
-from lib.probers import Prober, BertOProber, Wav2Vec2Prober, T5Prober
+from lib.probers import Prober, BertOProber, Wav2Vec2Prober
 from lib.pipeline import Probing_pipeline
 from IPython.display import clear_output
 from lib.tokenizers import Wav2Vec2OProcessor
