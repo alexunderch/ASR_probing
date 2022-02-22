@@ -10,6 +10,7 @@ from lib.base.constants import Constants
 from lib.base.prober import Prober
 from lib.base.utils import _lang, _make_directory_structure
 from collections import Callable
+from typing import Dict, List, Union 
 
 import os
 import numpy as np
@@ -21,7 +22,7 @@ class SimpleNLPPipeline(object):
                    dataset_name: str,
                    dataset_type: str,
                    feature: str,
-                   layers: list,
+                   layers: Union[Dict, List],
                    tokenizer: Processor,
                    data_column: str = 'text',
                    model_path: str = None,
