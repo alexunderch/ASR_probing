@@ -11,7 +11,7 @@ from .base.clf import LinearModel, Loss
 from .base.prober import Prober
 import os
 import numpy as np
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from copy import deepcopy
 from collections import Callable
 
