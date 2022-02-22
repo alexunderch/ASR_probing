@@ -15,7 +15,7 @@ from copy import deepcopy
 from collections import Callable
 
 
-from .utils import test_ipkernel
+from .base.utils import test_ipkernel
 
 if test_ipkernel(): from tqdm.notebook import tqdm 
 else: from tqdm import tqdm
