@@ -24,6 +24,7 @@ else: from tqdm import tqdm
 class BertOProber(Prober):
     def __init__(self, model_path: Union[Str, Dict], writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
         super().__init__(BertModel, model_path, writer, data, device, init_strategy)
+        self.model.config.is_decoder = False
         if init_strategy is not None:
             print_if_debug("reseting network parameters...", self.cc.DEBUG)
             assert isinstance(init_strategy, str)
@@ -101,7 +102,7 @@ class Wav2Vec2Prober(Prober):
     def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
 
         super().__init__(Wav2Vec2ForCTC, model_path, writer, data, device, init_strategy)
-
+        self.model.config.is_decoder = False
         if init_strategy is not None:
             print_if_debug("reseting network parameters...", self.cc.DEBUG)
             assert isinstance(init_strategy, str)
