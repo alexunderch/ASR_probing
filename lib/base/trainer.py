@@ -3,12 +3,17 @@
 from typing import Callable, List, Any, Tuple, Union
 import torch
 import torch.utils.tensorboard
-from tqdm.autonotebook import tqdm
 import numpy as np
 from .profilers import MyLogger, ProbingProfiler
 from .clf import Loss
 import gc
 from sklearn.metrics import f1_score
+
+from .utils import test_ipkernel
+
+if test_ipkernel(): from tqdm.notebook import tqdm 
+else: from tqdm import tqdm
+
 class CustomMetrics(object):
     """A class to add and invent your own callable metrics"""
     def __init__(self, metrics_name: str, fnct: Callable):
