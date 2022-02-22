@@ -51,7 +51,20 @@ Examples of usage:
                        feature = 'label', layers = list(np.arange(1, 5, 1)), use_mdl = True,
                        tokenizer= BertProcessor, data_path= "past_present.txt", 
                        device = torch.device('cuda'), data_column = "data")
+        
   ```
+With encoder-decoder architecture:
+```python
+    SimpleNLPPipeline(model2probe = T5EncoderDecoderProber, dataset_name = "t5",
+                      model_path = None,
+                      dataset_type = "person",  save_checkpoints = False, download_data = False,
+                      checkpoint_path = torch.load("t5small.pth").state_dict(),
+                      feature = 'label', layers = {"encoder": list(np.arange(1, 5, 1)), "decoder": list(np.arange(1, 5, 1))}, 
+                      tokenizer= T5Processor, data_path= "person.tsv", device = torch.device('cuda'), data_column = "text")
+
+
+```
+  
 ## For own-formatted datasets (TBD)
 
 ## Plotting results
