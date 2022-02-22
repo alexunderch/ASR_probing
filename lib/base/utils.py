@@ -9,7 +9,11 @@ nltk.download('averaged_perceptron_tagger')
 import numpy as np
 import json
 import os
+import sys
 from .constants import Constants
+
+def test_ipkernel():
+    return 'ipykernel_launcher.py' in sys.argv[0] 
 
 def remove_special_characters(batch):
     chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
