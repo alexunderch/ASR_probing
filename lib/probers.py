@@ -1,5 +1,6 @@
 from ast import Str
-from typing import Dict, Union
+from base64 import encode
+from typing import Dict, Tuple, Union
 import torch
 from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration, T5EncoderModel
 from datasets import Dataset
@@ -207,11 +208,10 @@ class Wav2Vec2Prober(Prober):
         print_if_debug('running probes...', self.cc.DEBUG)
         return probing_info
 
-class T5Prober(Prober):
+class T5EncoderProber(Prober):
     def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
 
         super().__init__(T5EncoderModel, model_path, writer, data, device, init_strategy)
-        self.model.config.is_decoder = False
 
         if init_strategy is not None:
             print_if_debug("reseting network parameters...", self.cc.DEBUG)
@@ -298,4 +298,109 @@ class T5Prober(Prober):
             self.logger.log_string(self.profiler.rep + "\n")
 
         print_if_debug('running probes...', self.cc.DEBUG)
+        return probing_info
+
+
+class T5EncoderDecoderProber(Prober):
+    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+
+        super().__init__(T5ForConditionalGeneration, model_path, writer, data, device, init_strategy)
+
+        if init_strategy is not None:
+            print_if_debug("reseting network parameters...", self.cc.DEBUG)
+            assert isinstance(init_strategy, str)
+            if init_strategy == "full": 
+                for module in self.model.modules(): self.model._init_weights(module)
+            else: print("No init with {} strategy".format(init_strategy))
+        #debugging tools
+        self.writer = writer
+        self.data = data
+        self.device = device
+
+        self.model.fixed_ = None
+
+    def make_hidden_states(self, example) -> list:
+        with torch.no_grad(): 
+            output = self.model(example[0].to(self.device), 
+                            attention_mask = example[1].to(self.device),
+                            output_hidden_states = True,
+                            output_attentions = True,
+                            return_dict = True)
+        return [hs.cpu().view((len(hs), -1)).numpy() for hs in output.hidden_states]
+
+
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: dict = {"encoder": [1], "decoder": [1]}, from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
+        self.fixed_ = {'encoder': self.model.encoder.block.cpu(), 'decoder': self.model.decoder.block.cpu()}
+        self.lm_head = torch.nn.Identity(512)
+        assert np.alltrue([l > 0 and l < len(self.fixed_["encoder"]) for l in layers['encoder']])
+        assert np.alltrue([l > 0 and l < len(self.fixed_["decoder"]) for l in layers['decoder']])
+
+        def _prepare_data(batch):
+            """Helper function
+            """
+            labels = batch['label'].to(self.device)
+            inp_values, att_masks =  batch['input_values'][0].to(self.device), batch['attention_mask'][0].to(self.device)
+            return inp_values, att_masks, labels
+
+
+        print_if_debug("stacking classifiers...", self.cc.DEBUG)
+
+        loss_fn = Loss(use_variational)
+
+
+        inputs, attention_masks, _ = _prepare_data(iter(self.dataloader).next())
+
+        probing_info ={'encoder': {'loss': [], 'metrics': []}, 'decoder': {'loss': [], 'metrics': []}}
+
+        model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO, 
+                        'hidden_size': 100,
+                        'out_size': len(torch.unique(self.data['label'])),
+                        'variational': use_variational,
+                        'device': self.device}
+        
+        def _probe(model_config: dict, mode: str, layer: int) -> Tuple[float, float]:
+
+            self.logger.log_string(f"layer {layer} of {len(layers[mode])} [{mode}] in process")     
+            getattr(self.model, mode).block = deepcopy(torch.nn.ModuleList(self.fixed_[mode][:layer]).to(self.device))       
+            if enable_grads:
+                for module in list(getattr(self.model, mode).block)[:-1]:
+                    for param in module.parameters(): param.requires_grad = False
+
+            probing_model = prober(parent_model = self.model,
+                                    clf = LinearModel(**model_config),
+                                    enable_grads = enable_grads,
+                                    encoder_decoder = False if mode == "encoder" else True,
+                                    ).to(self.device)
+            probing_model.eval()
+            self.writer.add_graph(probing_model, input_to_model = [inputs, attention_masks])
+            tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
+                    loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
+            print_if_debug("training...", self.cc.DEBUG)
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
+
+            if save_outputs:
+                chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
+                                            task_title = "" if task_title is None else task_title['title'],
+                                            params = model_config, layer_idx = layer, optimizer = tr.optimizer)
+                print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
+            
+            self._clear_cache()
+            print_if_debug("validating...", self.cc.DEBUG)
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
+
+            probing_model = probing_model.cpu()
+            del probing_model
+            self.logger.log_string(self.profiler.rep + "\n")
+            return valid_loss, valid_metrics
+
+        print_if_debug('making probes...', self.cc.DEBUG)
+        for m in ['encoder', 'decoder']:    
+            for layer in tqdm(layers[m], total = len(layers[m])):
+                prinfo = _probe(model_config = model_config, mode = m, layer = layer)
+                probing_info[m]['loss'].append(prinfo[0])
+                probing_info[m]['metrics'].append(prinfo[1])
+                
+            
+
+        print_if_debug('done probes...', self.cc.DEBUG)
         return probing_info

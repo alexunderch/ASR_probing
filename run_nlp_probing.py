@@ -1,7 +1,7 @@
 
 from lib.linguistic_utils import NLPDatasetProcessor
 from lib.tokenizers import T5Processor, BertProcessor
-from lib.probers import BertOProber, T5Prober
+from lib.probers import BertOProber, T5EncoderProber, T5EncoderDecoderProber
 from lib.base.processing import Processor
 from lib.pipeline import Probing_pipeline
 from IPython.display import clear_output
@@ -50,13 +50,14 @@ class SimpleNLPPipeline(object):
 
         data_proc.process_dataset(data_col = data_column)           
         self.results = []
-        layers = list(sorted(layers))
+        layers = list(sorted(layers)) if isinstance(layers, list) else layers
         _ = _make_directory_structure()
 
         for init_strategy in model_init_strategies:
             title = dataset_name + "_" 'lang=en_' + feature + "_task_random=" + str(init_strategy) +\
                     "_grads="  +str(enable_grads) + "_variational=" + str(use_mdl)
-            writer = SummaryWriter(os.path.join(cc.LOGGING_DIR, title, "layers={}-{}".format(layers[0], layers[-1])))
+            writer = SummaryWriter(os.path.join(cc.LOGGING_DIR, title, 
+                                  "layers={}-{}".format(layers[0], layers[-1]) if isinstance(layers, list) else f"layers={layers}"))
             pipe = Probing_pipeline(writer = writer, device = device,
                                     feature = feature, model_path = model_path, 
                                     lang = None, split = dataset_split)
@@ -81,23 +82,34 @@ class SimpleNLPPipeline(object):
 
 
 def main():
-    SimpleNLPPipeline(model2probe = T5Prober, dataset_name = "t5", ##important!!!!
-                       model_path = None,
-                       dataset_type = "person",  save_checkpoints = True, download_data = True,
-                       checkpoint_path = torch.load("t5small.pth").state_dict(),
-                       feature = 'label', layers = list(np.arange(1, 5, 1)), 
-                       tokenizer= T5Processor, data_path= "person.tsv", device = torch.device('cuda'), data_column = "text")
+    # SimpleNLPPipeline(model2probe = T5Prober, dataset_name = "t5", ##important!!!!
+    #                    model_path = None,
+    #                    dataset_type = "person",  save_checkpoints = True, download_data = True,
+    #                    checkpoint_path = torch.load("t5small.pth").state_dict(),
+    #                    feature = 'label', layers = list(np.arange(1, 5, 1)), 
+    #                    tokenizer= T5Processor, data_path= "person.tsv", device = torch.device('cuda'), data_column = "text")
 
-    SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "lovethisdataset2", model_path = 'bert-base-cased',
-                       dataset_type = "DiscoEval",  save_checkpoints = False, 
-                       feature = 'label', layers = list(np.arange(1, 5, 1)), 
-                       tokenizer= BertProcessor, data_path= "SP", device = torch.device('cuda'), data_column = "data")
 
-    layers = list(np.arange(1, 2, 1))
-    SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "bert", model_path = None,
-                       dataset_type = "senteval",  save_checkpoints = False, dataset_split = 'train',
-                       feature = 'label', layers = list(np.arange(1, 2, 1)), 
-                       tokenizer= BertProcessor, data_path= "past_present.txt", device = torch.device('cuda'), data_column = "data")
+    SimpleNLPPipeline(model2probe = T5EncoderDecoderProber, dataset_name = "t5",
+                      model_path = None,
+                      dataset_type = "person",  save_checkpoints = False, download_data = False,
+                    #    checkpoint_path = torch.load("t5small.pth").state_dict(),
+                      feature = 'label', layers = {"encoder": list(np.arange(1, 5, 1)), "decoder": list(np.arange(1, 5, 1))}, 
+                      tokenizer= T5Processor, data_path= "person.tsv", device = torch.device('cuda'), data_column = "text")
+
+
+
+
+    # SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "lovethisdataset2", model_path = 'bert-base-cased',
+    #                    dataset_type = "DiscoEval",  save_checkpoints = False, 
+    #                    feature = 'label', layers = list(np.arange(1, 5, 1)), 
+    #                    tokenizer= BertProcessor, data_path= "SP", device = torch.device('cuda'), data_column = "data")
+
+    # layers = list(np.arange(1, 2, 1))
+    # SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "bert", model_path = None,
+    #                    dataset_type = "senteval",  save_checkpoints = False, dataset_split = 'train',
+    #                    feature = 'label', layers = list(np.arange(1, 2, 1)), 
+    #                    tokenizer= BertProcessor, data_path= "past_present.txt", device = torch.device('cuda'), data_column = "data")
 
 
 
