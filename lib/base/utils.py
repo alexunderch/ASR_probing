@@ -11,6 +11,17 @@ import json
 import os
 import sys
 from .constants import Constants
+from copy import deepcopy
+from collections import OrderedDict
+
+def copy_state_dict(model_from: OrderedDict, model_to: OrderedDict, keys2copy: list):
+  """Copies keys from model_from.state_dict() to model_to.state_dict()
+  keys2copy (list): list of keys copy between models
+  """
+  for key in keys2copy: model_to[key] = deepcopy(model_from[key])
+  return model_to
+  
+
 
 def test_ipkernel():
     return 'ipykernel_launcher.py' in sys.argv[0] 
