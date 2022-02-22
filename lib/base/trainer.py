@@ -3,7 +3,7 @@
 from typing import Callable, List, Any, Tuple, Union
 import torch
 import torch.utils.tensorboard
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 import numpy as np
 from .profilers import MyLogger, ProbingProfiler
 from .clf import Loss
