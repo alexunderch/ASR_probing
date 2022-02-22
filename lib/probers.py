@@ -11,9 +11,14 @@ from .base.clf import LinearModel, Loss
 from .base.prober import Prober
 import os
 import numpy as np
-from tqdm.autonotebook import tqdm
 from copy import deepcopy
 from collections import Callable
+
+
+from .utils import test_ipkernel
+
+if test_ipkernel(): from tqdm.notebook import tqdm 
+else: from tqdm import tqdm
 
 class BertOProber(Prober):
     def __init__(self, model_path: Union[Str, Dict], writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
