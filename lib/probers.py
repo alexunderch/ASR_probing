@@ -36,7 +36,7 @@ class BertOProber(Prober):
     def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.fixed_encoder = list(self.model.cpu().encoder.layer)
         self.model.pooler = torch.nn.Identity(1024)
-        assert np.alltrue([l > 0 and l < len(self.fixed_encoder) for l in layers])
+        assert np.alltrue([l > 0 and l <= len(self.fixed_encoder) for l in layers])
 
         def _prepare_data(batch):
             """Helper function
@@ -121,7 +121,7 @@ class Wav2Vec2Prober(Prober):
     def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.model.freeze_feature_extractor()
         self.fixed_encoder = self.model.wav2vec2.encoder.layers.cpu()
-        assert np.alltrue([l > 0 and l < len(self.fixed_encoder) for l in layers])
+        assert np.alltrue([l > 0 and l <= len(self.fixed_encoder) for l in layers])
 
         def make_hidden_states(example, model = self.model, device: torch.device = torch.device('cpu')) -> list:
             """Returns outputs of all model layers 
@@ -333,8 +333,8 @@ class T5EncoderDecoderProber(Prober):
     def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: dict = {"encoder": [1], "decoder": [1]}, from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.fixed_ = {'encoder': self.model.encoder.block.cpu(), 'decoder': self.model.decoder.block.cpu()}
         self.lm_head = torch.nn.Identity(512)
-        assert np.alltrue([l > 0 and l < len(self.fixed_["encoder"]) for l in layers['encoder']])
-        assert np.alltrue([l > 0 and l < len(self.fixed_["decoder"]) for l in layers['decoder']])
+        assert np.alltrue([l > 0 and l <= len(self.fixed_["encoder"]) for l in layers['encoder']])
+        assert np.alltrue([l > 0 and l <= len(self.fixed_["decoder"]) for l in layers['decoder']])
 
         def _prepare_data(batch):
             """Helper function
