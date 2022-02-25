@@ -1,5 +1,5 @@
 import argparse
-import lib
+import .base import Processor
 import torch
 from typing import Union, Dict
 def add_nlp_dataset_args(parser: argparse.ArgumentParser):
@@ -45,7 +45,7 @@ def add_custom_dataset_args(parser: argparse.ArgumentParser):
 def add_experiment_args(parser: argparse.ArgumentParser):
     """Args to set up model and processors"""
     parser.add_argument('--tokenizer',
-                        type = lib.base.Processor,
+                        type = Processor,
                         help =   "a tokenizer class")
        
     parser.add_argument('--model_path',
