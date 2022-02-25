@@ -19,7 +19,7 @@ Note: for 'DiscoEval' is should be ('DC', 'SP', 'PDTB') -- the name of used set.
 - `feature_column` (`str`): a column which should be probe on (should be in the probing dataset)
 - `tokenizer` (`lib.base.Processor`): a tokenizer class. 
 - `download_data` (`bool`): whether to use proper the first time or not (default = True)
-- `data_column` (`str`): a column with text to tokenize (defult = 'data', actual only for CSV/TSV files)
+- `data_column` (`str`): a column with text to tokenize (defult = 'data', actual only for CSV/TSV files)\
 Dataset preprocessing parameters:
 - `model_path` (`str`): a name of model to use ('bert', 't5' for nlp tasks); An important note: if `dataset_name` if not 't5' or 'bert' (then models load automatically), you should set this argument like 't5-small', 'bert-small-cased' etc.
 - `checkpoint_path` (`str` or `.state_dict()`): a path to checkpoint for standard `torch.nn.Module`  models or state dict for HuggingFaceModels (default = None)        
