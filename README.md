@@ -1,5 +1,5 @@
 # ASR_probing
-A framework for ASR probing using MDL approach: the project of paper is available [here](https://www.overleaf.com/read/xnmxbpvprjrp).
+A framework for ASR probing using MDL approach: the project of the paper is available [here](https://www.overleaf.com/read/xnmxbpvprjrp).
 ## Installation
 ```bash
 git clone https://github.com/alexunderch/ASR_probing.git
