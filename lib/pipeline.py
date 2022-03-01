@@ -1,5 +1,5 @@
 from typing import Dict, Union
-from .base.utils import NumpyEncoder, print_if_debug
+from .base.utils import NumpyEncoder, print_if_debug, DatasetSplit
 from .base.constants import Constants
 
 from .base.prober import Prober
@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from collections import Callable
 class Probing_pipeline:
     def __init__(self, writer: torch.utils.tensorboard.SummaryWriter, device: torch.device,
-                 feature: str, model_path: str, data: Dataset = None, lang: str = None, split: str = None) -> None:
+                 feature: str, model_path: str, data: Dataset = None, lang: str = None, split: DatasetSplit = None) -> None:
         """Hugging Face Dataset wrapper for ASR probing
         Args:
             writer, SummaryWriter: tensorboard writer to debug and visualize all probing process
@@ -58,11 +58,12 @@ class Probing_pipeline:
         if from_disk:
             assert isinstance(data_path, str) 
             self.dataset =  load_from_disk(data_path, **kwargs)
-            if self.split is not None and isinstance(self.dataset, DatasetDict): self.dataset = self.dataset[self.split] 
+            if self.split is not None and isinstance(self.dataset, DatasetDict): self.dataset = self.split.split_str(self.dataset)
         elif data_path is not None: 
             assert isinstance(data_path, str) 
-            self.dataset = load_dataset(data_path, name = self.lang, split = self.split,
-                                        **kwargs)         
+            self.dataset = load_dataset(data_path, name = self.lang, split = None,
+                                        **kwargs)
+            self.dataset = self.split.split_str(self.dataset)         
         else: assert self.dataset is not None
         self.own_feature_set = own_feature_set; self.only_custom_features = only_custom_features
 

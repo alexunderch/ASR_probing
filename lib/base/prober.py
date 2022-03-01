@@ -77,7 +77,11 @@ class Prober:
                 ckpt = torch.load(checkpoint_path, map_location = self.device)
                 self.model.load_state_dict(ckpt)
             elif isinstance(checkpoint_path, dict):  self.model.load_state_dict(checkpoint_path)
-            else: print("Nothing has been loaded")
+            else:
+                try:
+                    print_if_debug("trying to load a huggingface checkpoint...", self.cc.DEBUG)
+                    self.model = self.model.from_pretrained(checkpoint_path, cache_dir = self.cc.CACHE_DIR).to(self.device)
+                except: print("Nothing has been loaded")
         
         if load_data: 
             assert isinstance(data_path, str)

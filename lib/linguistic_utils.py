@@ -1,6 +1,6 @@
 from typing import Union,  Dict
 from .base.constants import Constants
-from .base.utils import print_if_debug, label_batch
+from .base.utils import print_if_debug, label_batch, _check_download
 from .base.processing import Processor, DatasetProcessor
 
 
@@ -104,20 +104,36 @@ class NLPDatasetProcessor(DatasetProcessor):
         """
         if self.dtype == 'senteval': 
             assert self.fpath.endswith("txt")
-            if download: os.system(f"wget -O {self.fpath} https://raw.githubusercontent.com/facebookresearch/SentEval/main/data/probing/{self.fpath}")
+            if download:
+                try: _check_download(downloaded = f"https://raw.githubusercontent.com/facebookresearch/SentEval/main/data/probing/{self.fpath}",
+                                    path = self.fpath)
+                except ValueError: print(f"the {self.fpath} could not be downloaded, try to set `download_data=False` and do it manually.")
             self.load_TXT_file()
         elif self.dtype == 'person': 
             assert self.fpath.endswith("csv") or self.fpath.endswith("tsv")
-            if download: os.system(f"wget -O {self.fpath} https://media.githubusercontent.com/media/morphology-probing/morph-call/main/data/morphosyntactic_values/english/person.tsv")
+
+            if download:
+                try: _check_download(downloaded = f"https://media.githubusercontent.com/media/morphology-probing/morph-call/main/data/morphosyntactic_values/english/person.tsv",
+                                     path = self.fpath)
+                except ValueError: print(f"the {self.fpath} could not be downloaded, try to set `download_data=False` and do it manually.") 
             self.load_CSV_file(sep = '\t', data_col = 'text', header = 0)
         elif self.dtype == 'conn': pass     
         elif self.dtype == 'DiscoEval': 
             assert isinstance(self.fpath, str) and self.fpath in ['DC', 'SP', 'PDTB']
             if download:
-                os.makedirs(self.fpath, exist_ok=True)
-                os.system(f"wget -O {os.path.join(self.fpath, 'train.txt')} https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/train.txt")
-                os.system(f"wget -O {os.path.join(self.fpath, 'dev.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/valid.txt")
-                os.system(f"wget -O {os.path.join(self.fpath, 'test.txt')}  https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/test.txt")
+                os.makedirs(self.fpath, exist_ok = True)
+                try: _check_download(downloaded = f"https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/train.txt",
+                                     path = os.path.join(self.fpath, 'train.txt'))
+                except ValueError: print(f"the {self.fpath} could not be downloaded, try to set `download_data=False` and do it manually.") 
+
+                try: _check_download(downloaded = f"https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/valid.txt",
+                                     path = os.path.join(self.fpath, 'dev.txt'))
+                except ValueError: print(f"the {self.fpath} could not be downloaded, try to set `download_data=False` and do it manually.") 
+
+                try: _check_download(downloaded = f"https://raw.githubusercontent.com/ZeweiChu/DiscoEval/master/data/{self.fpath}/" + ("Explicit" if self.fpath == 'PDTB' else "wiki") + "/test.txt",
+                                     path = os.path.join(self.fpath, 'test.txt'))
+                except ValueError: print(f"the {self.fpath} could not be downloaded, try to set `download_data=False` and do it manually.") 
+
             self.load_DC_dataset(os.path.join(self.fpath, 'train.txt'), 'train')
             self.load_DC_dataset(os.path.join(self.fpath, 'dev.txt'), 'dev')
             self.load_DC_dataset(os.path.join(self.fpath, 'test.txt'), 'test')
