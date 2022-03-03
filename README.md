@@ -1,4 +1,4 @@
-# ASR_probing
+# ASR probing
 A framework for ASR probing using MDL approach: the project of the paper is available [here](https://www.overleaf.com/read/xnmxbpvprjrp).
 ## Installation
 ```bash
