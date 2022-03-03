@@ -12,25 +12,25 @@ Yes, it is that simple. Let us to figure out the input parameters:
 Dataset preprocessing parameters:
 - `morph_call`(`str`): the name of a hardcoded dataset prepared for probing task. The following ones are available: 'senteval', 'person', 'DiscoEval'('DC', 'SP', 'PDTB') 
 (others are in process)
-- `dataset_split`(`str`): the dataset split which would be used for probing; huggingface splits are available [link](https://huggingface.co/docs/datasets/splits.html) but you can also use composed splits (e.g. 'dev;test' -- separated by ";") and use "all"  to concatenate all splits in one dataset (default = 'test')
+- `dataset_split`(`str`): the dataset split which would be used for probing; huggingface splits are available [link](https://huggingface.co/docs/datasets/splits.html) but you can also use composed splits (e.g. 'dev;test' -- separated by ";") and use "all"  to concatenate all splits in one dataset (`default = 'test'`)
 - `filepath` (`str`): a filepath to downloaded dataset files (for 'senteval' it should be like filename.txt); 
 Note: for 'DiscoEval' is should be ('DC', 'SP', 'PDTB') -- the name of used set.
 - `dataset_name`(`str`): a name the dataset should be saved under.
 - `feature_column` (`str`): a column which should be probe on (should be in the probing dataset)
 - `tokenizer` (`lib.base.Processor`): a tokenizer class. 
-- `download_data` (`bool`): whether to use proper the first time or not (default = True)
+- `download_data` (`bool`): whether to use proper the first time or not (`default = True`)
 - `data_column` (`str`): a column with text to tokenize (defult = 'data', actual only for CSV/TSV files)
 - `data_path` (`str`): a path to save the preprocessed probing dataset \
 Dataset preprocessing parameters:
 - `model_path` (`str`): a name of model to use ('bert', 't5' for nlp tasks); An important note: if `dataset_name` if not 't5' or 'bert' (then models load automatically), you should set this argument like 't5-small', 'bert-small-cased' etc.
-- `checkpoint` (`str` or `.state_dict()`): a path to checkpoint for standard `torch.nn.Module`  models or state dict for HuggingFaceModels: you can specify checkpoint in three ways: if the file is availabe and suitable for the used model, it can be instantiated like str-filepath, or you can specify str-address for huggingface hub; if it is available but not suitable, you can prepare statedict for the model and specify it. (default = None)        
-- `model_init_strategies` (`list`): a list of model initialized stategies (default =  [None] + ["full"])
-- `use_mdl` (`bool`): use MDL (variational approach) or not (default = False)
-- `device` (`torch.device`): device to probe on (default = torch.device('cpu')) 
-- `probing_fn` (`torch.nn.Module`): a class of prbong classier (default = ProberModel)
-- `enable_grads`(`bool`): a flag backprop through last layers or not (default = False)
-- `save_checkpoints` (`bool`): save checkpoints for each layer or not (default = False) 
-- `return_results` (`bool`): (default = False)
+- `checkpoint` (`str` or `.state_dict()`): a path to checkpoint for standard `torch.nn.Module`  models or state dict for HuggingFaceModels: you can specify checkpoint in three ways: if the file is availabe and suitable for the used model, it can be instantiated like str-filepath, or you can specify str-address for huggingface hub; if it is available but not suitable, you can prepare statedict for the model and specify it. (`default = None`)        
+- `model_init_strategies` (`list`): a list of model initialized stategies (`default =  [None, "full"]`)
+- `use_mdl` (`bool`): use MDL (variational approach) or not (`default = False`)
+- `device` (`torch.device`): device to probe on (`default = torch.device('cpu')`) 
+- `probing_fn` (`torch.nn.Module`): a class of prbong classier (`default = ProberModel`)
+- `enable_grads`(`bool`): a flag backprop through last layers or not (`default = False`)
+- `save_checkpoints` (`bool`): save checkpoints for each layer or not (`default = False`) 
+- `return_results` (`bool`): (`default = False`)
 
 Examples of usage:
   ```python
