@@ -5,7 +5,7 @@ import torch
 import torch.utils.tensorboard
 import numpy as np
 from .profilers import MyLogger, ProbingProfiler
-from .clf import Loss
+from .layers import Loss
 import gc
 from sklearn.metrics import f1_score
 

@@ -67,88 +67,11 @@ class Probing_pipeline:
         else: assert self.dataset is not None
         self.own_feature_set = own_feature_set; self.only_custom_features = only_custom_features
 
-    def _filter_data(self, own_feature_set: dict, only_custom_features: bool) -> None:
-        """
-        Args: 
-          own_feature_set, dict (format {feat: int}): own mapping to probing labels
-                                                    default = None
-          only_custom_features, bool: flag whether to use only custom features or add "other" ground class,
-                                      active only with own_feature_set, default = True
-
-        """
-        self.dataset = self.dataset.filter(lambda example: len(example[self.feature].strip()) > 0)
-        if own_feature_set is None: self.f_set = {v: k for k, v in enumerate(list(set(self.dataset[self.feature])))}
-        else: 
-            assert isinstance(own_feature_set, dict)
-            self.f_set = own_feature_set            
-            if not only_custom_features:
-                self.f_set["other"] = np.max(list(self.f_set.values())) + 1
-                def foo(batch):
-                    if batch[self.feature] not in self.f_set.keys(): batch[self.feature] = "other"
-                    return batch                    
-                self.dataset = self.dataset.map(foo)
-            else: self.dataset = self.dataset.filter(lambda example: example[self.feature] in self.f_set)
-
-
+    
     def get_dataset(self): return self.dataset
     def get_feature_set(self): 
         """All labels """
         return self.f_set
-
-    def preprocess_data(self, preprocessing_fn: Callable, feature_processing_fn: Callable, save_path: str = None, drop_columns: list = None, target_processing: Callable = None):
-        """
-        Args:
-            preprocessinf_fn, callable object: prerpocessing dataset function to load all audio, should return the same self.dataset
-                                               but with 'speech', 'len_speech', 'sampling_rate' columns
-            save_path, str: optional path to save preprocessed data
-                            default = None
-            drop_columns, list: optional list of string-like columns to drop from the dataset
-                                default = None
-            target_processing, callable object: prerpocessing dataset function to speech transcript. Shouldn't change the dataset structure
-                                                default = None
-        """
-        print_if_debug("downloading necessary staff...", self.cc.DEBUG)
-        def encode_labels(example, feature_column: str):
-            """Label Encoder
-            """
-            example["label"] = self.f_set[example[feature_column]]
-            
-            return example
-
-        print_if_debug('reading files...', self.cc.DEBUG)
-        if preprocessing_fn is not None:
-            self.dataset = self.dataset.map(preprocessing_fn, fn_kwargs = {'feature_column': self.feature}, disable_nullable = False)
-        print_if_debug('encoding features...', self.cc.DEBUG)
-        self._filter_data(self.own_feature_set, self.only_custom_features)
-        self.dataset = self.dataset.map(encode_labels, fn_kwargs = {'feature_column': self.feature})
-        print_if_debug('processing features...', self.cc.DEBUG)
-        if feature_processing_fn is not None:
-            self.dataset = self.dataset.map(feature_processing_fn, fn_kwargs = {'feature_column': self.feature, 
-                                                                                'max_len': np.max(self.dataset['len_speech'])})
-
-        if drop_columns is not None:
-            print_if_debug('removing user-picked columns...', self.cc.DEBUG)
-            assert isinstance(drop_columns, list) or isinstance(drop_columns, str)
-            if isinstance(drop_columns, str): self.dataset = self.dataset.remove_columns([drop_columns])
-            elif isinstance(drop_columns, list): self.dataset = self.dataset.remove_columns(drop_columns)
-        self.dataset = self.dataset.remove_columns([self.feature, 'speech', 'len_speech', 'sampling_rate'])
-
-        if target_processing is not None:
-            print_if_debug('target processing... (is ON)', self.cc.DEBUG)
-            assert isinstance(target_processing, dict)
-            assert ['fn', 'kwargs'] == list(target_processing.keys()) 
-            assert isinstance(target_processing['fn'], type(lambda x: None)) and\
-                   isinstance(target_processing['kwargs'], dict)
-
-            self.dataset = self.dataset.map(target_processing['fn'], fn_kwargs = target_processing['kwargs'])
-
-        if save_path is not None:
-            assert isinstance(save_path, str) 
-            print_if_debug('saving files...', self.cc.DEBUG)
-            if self.lang is None: self.lang = "en"
-            self.dataset.save_to_disk(os.path.join(save_path, self.feature + "_" + self.lang + "_dataset"))
-        print('done')
-        return self
     
     def run_probing(self, probing_taskk: Prober, probing_fn, layers: list, checkpoint_path: Union[str, Dict] = None, enable_grads = False, use_variational: bool = False, init_strategy: str = None, plotting_fn: Callable = None, 
                     save_checkpoints: bool = False, plotting_config: dict = None, **kwargs) -> dict:

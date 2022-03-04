@@ -1,5 +1,5 @@
 import argparse
-import .base import Processor
+from .base.processing import Processor
 import torch
 from typing import Union, Dict
 def add_nlp_dataset_args(parser: argparse.ArgumentParser):

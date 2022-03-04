@@ -47,6 +47,7 @@ class DatasetProcessor(object):
         self.task_data = {'train': {'data': [], self.feature_column: []},
                         'dev': {'data': [], self.feature_column: []},
                         'test': {'data': [], self.feature_column: []}}
+        self.cc = Constants
     
     def process_dataset(self, data_col: Union[str, List] = "data", load_from_disk = False) -> Union[Dataset, DatasetDict]:
         """A main processing function of the class.

@@ -7,7 +7,7 @@ from datasets import Dataset
 from .base.utils import print_if_debug
 from .base.constants import Constants
 from .base.trainer import Trainer, F1Score
-from .base.clf import LinearModel, Loss
+from .base.layers import LinearModel, Loss
 
 from .base.prober import Prober
 import os

@@ -4,7 +4,7 @@ from lib.probers import BertOProber, T5EncoderProber, T5EncoderDecoderProber
 from lib.base.processing import Processor
 from lib.pipeline import Probing_pipeline
 from IPython.display import clear_output
-from lib.base.clf import ProberModel
+from lib.clf import ProberModel
 from lib.base.constants import Constants
 from lib.base.prober import Prober
 from lib.base.utils import _lang, _make_directory_structure, DatasetSplit
@@ -46,7 +46,7 @@ class SimpleNLPPipeline(object):
                                         feature_column = feature, tokenizer = tokenizer)
         
         data_proc.download_data(download = download_data)
-        data_proc.process_dataset(data_col = data_column)
+        data_proc.process_dataset(data_col = data_column) 
 
         self.results = []
         layers = list(sorted(layers)) if isinstance(layers, list) else layers
