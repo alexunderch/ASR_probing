@@ -46,7 +46,7 @@ class SimpleNLPPipeline(object):
                                         feature_column = feature, tokenizer = tokenizer)
         
         data_proc.download_data(download = download_data)
-        data_proc.process_dataset(data_col = data_column) 
+        data_proc.process_dataset(data_col = data_column, _save_to_disk = True) 
 
         self.results = []
         layers = list(sorted(layers)) if isinstance(layers, list) else layers
@@ -62,8 +62,7 @@ class SimpleNLPPipeline(object):
                                     lang = None, split = DatasetSplit(dataset_split))
             pipe.disable_cache()
             if not download_data: assert isinstance(data_path, str)
-            pipe.load_data(from_disk = True, data_path = dataset_name, 
-                            own_feature_set = data_proc.tok2label, only_custom_features = False)
+            pipe.load_data(from_disk = True, data_path = dataset_name)
 
             print("The task title:", title)
             print(f"The features are: {data_proc.tok2label}")
@@ -104,11 +103,11 @@ def main():
                        feature = 'label', layers = list(np.arange(1, 3, 1)),  dataset_split= "all",
                        tokenizer= BertProcessor, data_path= "SP", device = torch.device('cuda'), data_column = "data")
     
-    SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "lovethisdataset2", model_path = 'bert-base-cased',
-                       checkpoint = "bert-base-cased",
-                       morph_call = "DiscoEval",  save_checkpoints = False, 
-                       feature = 'label', layers = list(np.arange(1, 3, 1)),  dataset_split= "dev;test", download_data = True,
-                       tokenizer= BertProcessor, data_path= "DC", device = torch.device('cuda'), data_column = "data")
+    # SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "lovethisdataset2", model_path = 'bert-base-cased',
+    #                    checkpoint = "bert-base-cased",
+    #                    morph_call = "DiscoEval",  save_checkpoints = False, 
+    #                    feature = 'label', layers = list(np.arange(1, 3, 1)),  dataset_split= "dev;test", download_data = True,
+    #                    tokenizer= BertProcessor, data_path= "DC", device = torch.device('cuda'), data_column = "data")
 
     # layers = list(np.arange(1, 2, 1))
     # SimpleNLPPipeline(model2probe = BertOProber, dataset_name = "bert", model_path = None,

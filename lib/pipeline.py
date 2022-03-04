@@ -39,9 +39,10 @@ class Probing_pipeline:
         self.model_path = model_path
         self.dataset = data
         self.device = device
+        self.f_set = None
     
 
-    def load_data(self, from_disk: bool, data_path: str = None, own_feature_set: dict = None, only_custom_features: bool = True, **kwargs) -> None:
+    def load_data(self, from_disk: bool, data_path: str = None,  **kwargs) -> None:
         """Custom dataloader
         Args:
             from_disk: bool, flag if load data from disk checkpoint or from the Internet
@@ -65,7 +66,7 @@ class Probing_pipeline:
                                         **kwargs)
             self.dataset = self.split.split_str(self.dataset)         
         else: assert self.dataset is not None
-        self.own_feature_set = own_feature_set; self.only_custom_features = only_custom_features
+        # self.own_feature_set = own_feature_set; self.only_custom_features = only_custom_features
 
     
     def get_dataset(self): return self.dataset

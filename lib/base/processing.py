@@ -25,7 +25,8 @@ class DatasetProcessor(object):
     def __init__(self, dataset_type: str, 
                        model_path: Union[str, Dict],
                        filepath: str, dataset_name: str, 
-                       feature_column: str, tokenizer: Optional[Callable] = None) -> None:
+                       feature_column: str, tokenizer: Optional[Callable] = None, 
+                       f_set: dict = None, only_custom_features: bool = False) -> None:
 
         """Args:
             dataset_type, str: one of precomputed dataset_types: ['senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
@@ -44,6 +45,8 @@ class DatasetProcessor(object):
         self.dname = dataset_name
         self.feature_column = feature_column
         self.maxlen = 0 
+        self.tok2label = f_set
+        self.only_custom_features = only_custom_features
         self.task_data = {'train': {'data': [], self.feature_column: []},
                         'dev': {'data': [], self.feature_column: []},
                         'test': {'data': [], self.feature_column: []}}

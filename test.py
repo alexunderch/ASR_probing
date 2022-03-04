@@ -63,12 +63,12 @@ class SimpleASRPipeline(TaskTester):
                                             lang = lang,  split = DatasetSplit(dataset_split))
                     pipe.disable_cache()
                     if from_disk: assert isinstance(data_path, str)
-                    pipe.load_data(from_disk = from_disk, data_path = dataset_name if not from_disk else data_path,
-                                   own_feature_set = own_feature_set, only_custom_features = False)
+                    pipe.load_data(from_disk = from_disk, data_path = dataset_name if not from_disk else data_path)
                     data_proc = ASRDatasetProcessor(dataset_type=morph_call, model_path=model_path, 
-                                                    feature_column=feature, tokenizer=tokenizer, dataset=pipe.dataset)
+                                                    feature_column=feature, tokenizer=tokenizer, dataset=pipe.dataset,
+                                                    f_set = own_feature_set, only_custom_features = False)
                     
-                    data_proc.process_dataset(preprocessing_fn=preprocessing_fn)
+                    pipe.dataset = data_proc.process_dataset(preprocessing_fn=preprocessing_fn)
                     print("The task title:", title)
                     res = pipe.run_probing(model2probe, probing_fn, layers = layers, enable_grads = enable_grads, 
                                 use_variational = use_mdl, 
@@ -200,9 +200,10 @@ def main():
     
 
 
-    SimpleASRPipeline()(model2probe = Wav2Vec2Prober, morph_call = "common_voice", model_path = None,
-                        save_checkpoints = False, dataset_language = ["ru"], dataset_name = "common_voice",
-                       features = ['age'], layers = list(np.arange(1, 3, 1)),  dataset_split= "all",
+    SimpleASRPipeline()(model2probe = Wav2Vec2Prober, morph_call = "timit_asr", model_path = None,
+                        save_checkpoints = False, dataset_language = [None], dataset_name = "timit_asr",
+                        preprocessing_fn=prepare_probing_task_timit_2,
+                       features = ['sex'], layers = list(np.arange(1, 3, 1)),  dataset_split= "test",
                        tokenizer= Wav2Vec2OProcessor, data_path= "SP", device = torch.device('cuda'), data_column = "data")
     
 

@@ -19,9 +19,11 @@ import numpy as np
 
 class ASRDatasetProcessor(DatasetProcessor):
     """Dataset wrapper for Huggingface ASR datasets"""
-    def __init__(self, dataset_type: str, model_path: Union[str, Dict], feature_column: str, tokenizer: Optional[Callable] = None, dataset: Dataset = None) -> None:
+    def __init__(self, dataset_type: str, model_path: Union[str, Dict], feature_column: str, tokenizer: Optional[Callable] = None,
+                 dataset: Dataset = None, f_set: dict = None, only_custom_features: bool = False) -> None:
         super().__init__(dataset_type, model_path, filepath = os.curdir, dataset_name = dataset_type, 
-                        feature_column = feature_column, tokenizer = tokenizer)
+                        feature_column = feature_column, tokenizer = tokenizer, f_set = f_set, 
+                        only_custom_features = only_custom_features)
         self.task_data = dataset
 
     def get_data(self):
@@ -49,7 +51,8 @@ class ASRDatasetProcessor(DatasetProcessor):
                 self.task_data = self.task_data.map(foo)
             else: self.task_data = self.task_data.filter(lambda example: example[self.feature_column] in self.f_set)
 
-    def process_dataset(self, preprocessing_fn: Callable, drop_columns: list = None, target_processing: Callable = None) -> Dataset:
+    def process_dataset(self, preprocessing_fn: Callable, drop_columns: list = None, target_processing: Callable = None, 
+                              _save_to_disk: bool = False) -> Dataset:
         """
         Args:
             preprocessinf_fn, callable object: prerpocessing dataset function to load all audio, should return the same self.dataset
@@ -72,26 +75,28 @@ class ASRDatasetProcessor(DatasetProcessor):
         if preprocessing_fn is not None:
             self.task_data = self.task_data.map(preprocessing_fn, fn_kwargs = {'feature_column': self.feature_column}, disable_nullable = False)
         print_if_debug('encoding features...', self.cc.DEBUG)
-        self._filter_data(self.own_feature_set, self.only_custom_features)
+        self._filter_data(self.tok2label, self.only_custom_features)
         self.task_data = self.task_data.map(encode_labels, fn_kwargs = {'feature_column': self.feature_column})
         print_if_debug('processing features...', self.cc.DEBUG)
-        self.task_data = self.task_data.map(self.tokenizer, fn_kwargs = {'data_column': 'speech', 
-                                                                                'max_len': np.max(self.dataset['len_speech'])})
+        self.task_data = self.task_data.map(self.tokenizer, fn_kwargs = {'data_column': 'speech', "feature_column": self.feature_column,
+                                                                                'max_len': np.max(self.task_data['len_speech'])})
 
         if drop_columns is not None:
             print_if_debug('removing user-picked columns...', self.cc.DEBUG)
             assert isinstance(drop_columns, list) or isinstance(drop_columns, str)
             if isinstance(drop_columns, str): self.task_data = self.task_data.remove_columns([drop_columns])
             elif isinstance(drop_columns, list): self.task_data = self.task_data.remove_columns(drop_columns)
-        self.task_data = self.task_data.remove_columns([self.feature, 'speech', 'len_speech', 'sampling_rate'])
+        self.task_data = self.task_data.remove_columns([self.feature_column, 'speech', 'len_speech', 'sampling_rate'])
 
         if target_processing is not None:
             print_if_debug('target processing... (is ON)', self.cc.DEBUG)
             assert isinstance(target_processing, dict)
             assert ['fn', 'kwargs'] == list(target_processing.keys()) 
-            assert isinstance(target_processing['fn'], type(lambda x: None)) and\
+            assert isinstance(target_processing['fn'], Callable) and\
                    isinstance(target_processing['kwargs'], dict)
 
             self.task_data = self.task_data.map(target_processing['fn'], fn_kwargs = target_processing['kwargs'])
+            self.task_data.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
 
+            if _save_to_disk: self.task_data.save_to_disk(self.dname)
         return self.task_data

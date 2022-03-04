@@ -95,13 +95,19 @@ class LinguisticDataset:
         return new_dataset
 
 class NLPDatasetProcessor(DatasetProcessor): 
-    def __init__(self, dataset_type: str, model_path: Union[str, Dict], filepath: str, dataset_name: str, feature_column: str, tokenizer: Optional[Processor] = None):
+    def __init__(self, dataset_type: str, model_path: Union[str, Dict], filepath: str, dataset_name: str, 
+                       feature_column: str, tokenizer: Optional[Processor] = None,
+                       dataset: Dataset = None):
         super().__init__(dataset_type, model_path, filepath, dataset_name, feature_column, tokenizer)
+        self.task_data = dataset
     def download_data(self, download: bool = True) -> str:
         """Args:
             download, bool: whether to download data
                             default = True 
         """
+        self.task_data = {'train': {'data': [], self.feature_column: []},
+                        'dev': {'data': [], self.feature_column: []},
+                        'test': {'data': [], self.feature_column: []}}
         if self.dtype == 'senteval': 
             assert self.fpath.endswith("txt")
             if download:
@@ -137,7 +143,6 @@ class NLPDatasetProcessor(DatasetProcessor):
             self.load_DC_dataset(os.path.join(self.fpath, 'train.txt'), 'train')
             self.load_DC_dataset(os.path.join(self.fpath, 'dev.txt'), 'dev')
             self.load_DC_dataset(os.path.join(self.fpath, 'test.txt'), 'test')
-        elif self.dtype == 'PDTB': pass
         else: print("nothing to download")
 
     def load_TXT_file(self) -> None:
@@ -169,6 +174,7 @@ class NLPDatasetProcessor(DatasetProcessor):
         self.task_data = {'train': {'data': [], self.feature_column: []},
                                 'dev': {'data': [], self.feature_column: []},
                                 'test': {'data': [], self.feature_column: []}}
+
         tok2split = {'tr': 'train', 'va': 'dev', 'te': 'test'}
         tmp_data = pd.read_csv(self.fpath, sep = sep, header = header)
 
@@ -189,6 +195,7 @@ class NLPDatasetProcessor(DatasetProcessor):
 
     def load_DC_dataset(self, path: str, _split: str) -> None:
         import io
+
         with io.open(path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.rstrip().split('\t')
@@ -208,18 +215,18 @@ class NLPDatasetProcessor(DatasetProcessor):
         else: self.task_data = load_dataset(path = self.dname)
 
 
-    def process_dataset(self, data_col: Union[str, List] = "data", load_from_disk = False): 
+    def process_dataset(self, data_col: Union[str, List] = "data", _save_to_disk: bool = False) -> Union[DatasetDict, Dataset]: 
         if not os.path.exists(self.fpath): _ = self.download_data() 
-        if load_from_disk:
-            self.task_data = self.loadHuggingFaceDataset(from_disk = load_from_disk)
-            dataset = self.task_data.map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col})
-        else:
-            dataset = DatasetDict()
-            for k, v in self.task_data.items(): 
-                dataset[k] = Dataset.from_dict(v)
-                dataset[k] = dataset[k].map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col} )
+
+        dataset = DatasetDict()
+        for k, v in self.task_data.items(): 
+            dataset[k] = Dataset.from_dict(v)
+            dataset[k] = dataset[k].map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col} )
+            print(k, dataset[k] )
+        print(dataset)
         dataset.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
-        dataset.save_to_disk(self.dname)
+        if _save_to_disk: dataset.save_to_disk(self.dname)
+        return self.task_data
 
 
 def _make_linguistic_dataset_for_wav2vec2() -> DatasetDict:
