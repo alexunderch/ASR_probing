@@ -3,6 +3,7 @@ import re
 import pickle
 import pandas as pd
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 from  IPython.display import clear_output
 
@@ -23,8 +24,7 @@ def make_probing(data, labels):
 
 ##common_voice
 def prepare_probing_task(batch, feature_column: str):
-    frame_offset, num_frames = 16000, 16000
-    sp, sr = load(batch["path"], frame_offset = frame_offset, num_frames = num_frames)
+    sp, sr = torch.tensor(batch['audio']['array']), batch['audio']['sampling_rate']
     resampler = transforms.Resample(sr, 16000)
     batch['speech'] = resampler(sp).squeeze().numpy()
     batch["sampling_rate"] = 16000
