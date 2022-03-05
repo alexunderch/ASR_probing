@@ -12,7 +12,7 @@ venv:
 	$(VENV_PATH)/bin/pip install -r requirements.txt
 
 build: venv test
-`.PHONY: test_all
+`.PHONY: test
 
 test: venv
 	@$(VENV_PATH)/bin/python -m pytest --cov-report html --cov-report term --cov=df_engine tests/
