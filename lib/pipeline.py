@@ -24,8 +24,9 @@ class Probing_pipeline:
             custom_feature, bool: optional flag, a possibility to add feature not from original set
             data, Dataset: optional, Hugging Face Dataset class;
                            default = None
-            (lang, split), str: optional features to this class to determine necessary dataset options
-                                default = None
+            lang, str: an optional feature to this class to determine necessary dataset options
+                       default = None
+            split, DatasetSplit: a HuggingFace dataset splits (look docs) separated by ';' or "all" to use all available data.
 
         """
         self.cc = Constants
@@ -49,10 +50,6 @@ class Probing_pipeline:
                              default = False
             data_path, str: optional, active only if from_disk = True;
                             default = None      
-            own_feature_set, dict (format {feat: int}): optional own mapping to probing labels
-                                                    default = None
-            only_custom_features, bool:optional flag whether to use only custom features or add "other" ground class,
-                                      active only with own_feature_set, default = True
         """
         print_if_debug("loading data...", self.cc.DEBUG)
 
@@ -78,6 +75,7 @@ class Probing_pipeline:
                     save_checkpoints: bool = False, plotting_config: dict = None, **kwargs) -> dict:
         """Main probing runner
         Args:
+           probing_taskk, Prober: an instance of Prober class (model to be probed)
            probing_fn, init_strategy -- look at Prober docs
            checkpoint_path: str or dict: a path to pretrained model checkpoint or model state dict itself
                                          default = None

@@ -57,11 +57,11 @@ class ASRDatasetProcessor(DatasetProcessor):
         Args:
             preprocessinf_fn, callable object: prerpocessing dataset function to load all audio, should return the same self.dataset
                                                but with 'speech', 'len_speech', 'sampling_rate' columns
-            TBD
             drop_columns, list: optional list of string-like columns to drop from the dataset
                                 default = None
             target_processing, callable object: prerpocessing dataset function to speech transcript. Shouldn't change the dataset structure
                                                 default = None
+            _save_to_disk, bool: an optional flag whether to save the preprocessed dataset on disk or nor.
         """
         print_if_debug("downloading necessary staff...", self.cc.DEBUG)
         def encode_labels(example, feature_column: str):

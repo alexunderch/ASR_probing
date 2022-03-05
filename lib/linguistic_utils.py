@@ -222,8 +222,7 @@ class NLPDatasetProcessor(DatasetProcessor):
         for k, v in self.task_data.items(): 
             dataset[k] = Dataset.from_dict(v)
             dataset[k] = dataset[k].map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col} )
-            print(k, dataset[k] )
-        print(dataset)
+    
         dataset.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
         if _save_to_disk: dataset.save_to_disk(self.dname)
         return self.task_data
