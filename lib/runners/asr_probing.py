@@ -27,7 +27,6 @@ class SimpleASRPipeline(TaskTester):
                         layers: Union[List, Dict],
                         tokenizer: Processor,
                         dataset_name: str = None,
-                        data_column: str = 'text',
                         model_path: str = None,
                         preprocessing_fn: Callable = prepare_probing_task,
                         dataset_split: str = "test",
@@ -57,7 +56,7 @@ class SimpleASRPipeline(TaskTester):
                 for init_strategy in model_init_strategies:
                     title = (morph_call if dataset_name is None else dataset_name) +\
                              "_" + _lang(lang) + "_" + feature + "_task_random=" + str(init_strategy) +\
-                            "_grads="  +str(enable_grads) + "_variational=" + str(use_mdl) + ("_poisoned=" + str(poisoning_ratio)) if poisoning_ratio > 0 else str()
+                            "_grads="  +str(enable_grads) + "_variational=" + str(use_mdl) + (("_poisoned=" + str(poisoning_ratio)) if poisoning_ratio > 0 else str())
                     writer = tensorboard.SummaryWriter(os.path.join(cc.LOGGING_DIR, title, "layers={}-{}".format(layers[0], layers[-1])))
                     pipe = Probing_pipeline(writer = writer, device = device,
                                             feature = feature, model_path = model_path, 

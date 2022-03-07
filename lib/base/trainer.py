@@ -158,7 +158,7 @@ class Trainer():
                 self.writer.add_scalar("training loss of layer {}".format(info["layer"]), epoch_loss, it * len(train_loader))
                 self.scheduler.step() 
                 iterations.set_postfix({'train epoch loss': epoch_loss})
-        self._clear_cache()
+                self._clear_cache()
         return self
 
 

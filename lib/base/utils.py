@@ -2,6 +2,8 @@
 _lang = lambda l: "en" if l is None else l
 print_if_debug = lambda x, flag: print(x) if flag else None
 f_set = lambda col: {v: k for k, v in enumerate(list(set(col)))}
+reverse_dict = lambda _dict: dict((int(v), k) for k, v in _dict.items())
+
 
 import re
 import nltk

@@ -4,7 +4,7 @@ from .base.constants import Constants
 
 from .base.prober import Prober
 import torch
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset, load_from_disk, Audio
 from transformers import logging as log_models
 from datasets import Dataset, DatasetDict, set_caching_enabled, logging as log_data
 
@@ -43,7 +43,7 @@ class Probing_pipeline:
         self.f_set = None
     
 
-    def load_data(self, from_disk: bool, data_path: str = None,  **kwargs) -> None:
+    def load_data(self, from_disk: bool, data_path: str = None, **kwargs) -> None:
         """Custom dataloader
         Args:
             from_disk: bool, flag if load data from disk checkpoint or from the Internet
@@ -63,6 +63,7 @@ class Probing_pipeline:
                                         **kwargs)
             self.dataset = self.split.split_str(self.dataset)         
         else: assert self.dataset is not None
+        # if data_column == 'speech': self.dataset = self.dataset.cast_column("audio", Audio(sampling_rate = 16_000))
         # self.own_feature_set = own_feature_set; self.only_custom_features = only_custom_features
 
     
