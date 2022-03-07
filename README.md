@@ -17,4 +17,4 @@ pip install -r requirements.txt
 ## Coming soon
 1. Tests
 2. Improved docs and examples
-3. More datasets wrappers and Probers
+3. More encoding styles.
