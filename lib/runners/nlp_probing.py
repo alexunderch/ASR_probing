@@ -35,6 +35,7 @@ class SimpleNLPPipeline(object):
                         enable_grads = False,
                         save_checkpoints: bool = False, 
                         return_results: bool = False,
+                        is_prepared: bool = False,
                         **kwargs):
         cc = Constants
         if model_path is None: model_path = cc.MODELS_PATH[dataset_name]["None"] 
@@ -45,7 +46,7 @@ class SimpleNLPPipeline(object):
                                         dataset_name = dataset_name, 
                                         feature_column = feature, tokenizer = tokenizer)
         
-        data_proc.download_data(download = download_data)
+        data_proc.download_data(download = download_data, is_prepared = is_prepared)
         data_proc.process_dataset(data_col = data_column, _save_to_disk = True) 
 
         self.results = []
@@ -65,7 +66,7 @@ class SimpleNLPPipeline(object):
             pipe.load_data(from_disk = True, data_path = dataset_name)
 
             print("The task title:", title)
-            print(f"The features are: {data_proc.tok2label}")
+            print(f"The features are: {data_proc.tok2label if data_proc.tok2label else pipe.f_set}")
             res = pipe.run_probing(model2probe, probing_fn, layers = layers, enable_grads = enable_grads, 
                                 use_variational = use_mdl, 
                                 checkpoint = checkpoint,

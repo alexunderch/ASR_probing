@@ -100,10 +100,12 @@ class NLPDatasetProcessor(DatasetProcessor):
                        dataset: Dataset = None):
         super().__init__(dataset_type, model_path, filepath, dataset_name, feature_column, tokenizer)
         self.task_data = dataset
-    def download_data(self, download: bool = True) -> str:
+    def download_data(self, download: bool = True, is_prepared: bool = False) -> str:
         """Args:
             download, bool: whether to download data
                             default = True 
+            is_prepared, bool: if there is a HuggingFace prepared dataset to preprocess
+                               default = False
         """
         self.task_data = {'train': {'data': [], self.feature_column: []},
                         'dev': {'data': [], self.feature_column: []},
@@ -143,7 +145,13 @@ class NLPDatasetProcessor(DatasetProcessor):
             self.load_DC_dataset(os.path.join(self.fpath, 'train.txt'), 'train')
             self.load_DC_dataset(os.path.join(self.fpath, 'dev.txt'), 'dev')
             self.load_DC_dataset(os.path.join(self.fpath, 'test.txt'), 'test')
-        else: print("nothing to download")
+        else: 
+            print("nothing to download")
+            if is_prepared: _ = self.loadHuggingFaceDataset(from_disk = True)
+
+    def _find_maxlen(self, data_column: str = "text"):
+        assert isinstance(self.task_data, Dataset)
+        self.maxlen = np.max(map(len, list(self.task_data[data_column])))   
 
     def load_TXT_file(self) -> None:
         """Loading the .txt senteval files line by line"""
@@ -219,9 +227,14 @@ class NLPDatasetProcessor(DatasetProcessor):
         if not os.path.exists(self.fpath): _ = self.download_data() 
 
         dataset = DatasetDict()
-        for k, v in self.task_data.items(): 
-            dataset[k] = Dataset.from_dict(v)
-            dataset[k] = dataset[k].map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col} )
+
+        if isinstance(self.task_data, Dict):
+            for k, v in self.task_data.items(): 
+                dataset[k] = Dataset.from_dict(v)
+                dataset[k] = dataset[k].map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col} )
+        elif isinstance(self.task_data, Dataset):
+            self.maxlen = self._find_maxlen(data_column = data_col)
+            dataset = self.task_data.map(self.tokenizer, fn_kwargs = {'max_len': self.maxlen, 'data_column': data_col} )
     
         dataset.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
         if _save_to_disk: dataset.save_to_disk(self.dname)

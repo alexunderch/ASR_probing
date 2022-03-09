@@ -36,7 +36,7 @@ class DatasetProcessor(object):
             feature_column, str: a column name where the labels can be found
             tokenizer, Processor: a tokenizer to process inputs
         """
-        supported_datasets = ['senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
+        supported_datasets = [None, 'senteval', 'person', 'conn', 'DiscoEval', 'PDTB', 'huggingface', 'common_voice', 'timit_asr']
         assert dataset_type in supported_datasets, "no other types are not currently supported"
         self.dtype = dataset_type
         self.tokenizer = tokenizer(model_path = model_path)
