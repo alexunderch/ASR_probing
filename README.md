@@ -11,7 +11,7 @@ pip install -r requirements.txt
 1. [Probing for NLP](docs/nlp_probing.md)
 2. [Probing for ASR](docs/ASR_probing.md)
 3. Custom pipelines (TBD)
-4. Regularization fucntions (in detail, TBD)
+4. Regularization fucntions ([in detail](https://github.com/dfdazac/wassdistance/blob/master/layers.py), TBD)
 
 
 ## Coming soon
