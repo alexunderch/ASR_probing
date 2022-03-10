@@ -18,3 +18,4 @@ ipython
 torchmetrics==0.7.2
 sentencepiece==0.1.96
 tensorflow-io==0.24.0
+pycorenlp==0.3.0
