@@ -6,9 +6,12 @@ from pycorenlp import StanfordCoreNLP
 nlp = StanfordCoreNLP('http://localhost:9000')
 from nltk.tree import Tree, ParentedTree
 import nltk
-
+from datasets import load_dataset, Dataset, load_from_disk
 import numpy as np
+from collections import Counter
+
 #https://stanfordnlp.github.io/CoreNLP/download.html
+
 text = (
   'Pusheen and Smitha walked along the beach. '
   'Pusheen wanted to surf, but fell off the surfboard. '
@@ -68,24 +71,85 @@ def find_path_between(ptree, text1, text2):
 
 def parse_paths(text, thr = 4):
     ptree = ParentedTree.fromstring(text)
-    ptree.pretty_print()
+    # ptree.pretty_print()
     paths = []
-    for leave in ptree.leaves(): paths.append("_".join(findPath(ptree, leave)[:thr]) + "_")
+    for leave in ptree.leaves(): paths.append("_".join(findPath(ptree, leave)[:thr]) + "_.")
     return paths
-
-print(parse_paths(output['sentences'][0]['parse']))
 
 def get_constituency(batch, data_column: str, key: str):
     output = nlp.annotate(batch[data_column], properties = {'annotators': 'tokenize, ner, pos, depparse, parse',
                                                             'outputFormat': 'json' })
     batch['constituencies'] = list()
     for out in output['sentences']:
-        batch['constituencies'].extend(parse_paths(out[key]))
+        batch['constituencies'].extend(parse_paths(out[key]) + ['OTHER'])
+    
+    batch['constituencies'] = list(set(batch['constituencies']))
     return batch
 
 
+def prepare_dataset(dname: str, text_col: str):
+    d = load_dataset(dname, split = "train")
+    d = d.map(get_constituency, fn_kwargs = {"data_column": text_col, "key": "parse"})
+    d.save_to_disk(f"parsed_{dname}_large")
 
-# _paths(tree)
+_ = prepare_dataset("timit_asr", "text")
+
+def prepare_labels(dname_str:str):
+    data = load_from_disk(dname_str)
+    labels = list()
+    def collect_statistics(batch, ind):
+        labels.extend(batch["constituencies"])
+        print("help")
+        return batch
+    print(data)
+    data = data.map(collect_statistics, with_indices=True)
+    stats = Counter(labels)
+
+    def filter_(stats: Counter, low: int, high: int):
+        from string import punctuation
+        punct = [f"_{c}_" for c in punctuation]
+        def fpunct(expr: str):
+            for p in punct:
+                if p in expr: return False
+            return True
+
+        return {k: count for k, count in stats.items() 
+                if count >= low and count <= high and fpunct(k)}
+        
+    stats = filter_(stats, 10, 1000)
+    stats = dict(sorted(stats.items(), key=lambda item: -item[1]))
+    print(stats, len(stats))
+    return_ = {k: ind for ind, k in enumerate(list(stats.keys()))}
+    _ = return_.update({"OTHER": len(stats)})
+    return return_
+
+
+def label_dataset(dname_str:str, labels: dict):
+    data = load_from_disk(dname_str)
+    def label_map(batch):
+        print("help")
+
+        batch["top_constituency"] = "OTHER"
+        for label in labels.keys():
+            if label in batch["constituencies"]: 
+                print(label,  batch["constituencies"])
+                batch["top_constituency"] = label
+                break
+        return batch
+    return data.map(label_map)
+
+d = label_dataset("parsed_timit_asr_large", prepare_labels("parsed_timit_asr_large"))
+d.save_to_disk("parsed_timit_asr_large")
+import matplotlib.pyplot as plt
+from matplotlib.pyplot import hist
+fig = plt.figure(figsize=(15,4))
+ax = plt.gca()
+counts, _, patches = ax.hist(list(d['top_constituency']), bins=len(set(d['top_constituency'])),edgecolor='r')
+for count, patch in zip(counts,patches):
+    ax.annotate(str(int(count)), xy=(patch.get_x(), patch.get_height()))
+plt.show()
+
+#parsing sexpr
 ####https://gist.github.com/pib/240957
 from string import whitespace
 
@@ -125,53 +189,3 @@ def parse(sexp):
             else:  stack[-1] = ((stack[-1][0] + c),)
         i += 1
     return stack.pop()
-
-a = output['sentences'][1]['parse']
-# print(repr(a.replace("(", "").replace(")", "")))
-r =  parse(a)
-# print("parsed", r)
-
-import queue
-from datasets import Dataset
-from pycorenlp import StanfordCoreNLP
-import nltk.tree as tree
-import numpy as np
-from typing import List
-from collections import Counter
-
-
-class TopConstituency(object):
-    def __init__(self, dataset: Dataset, data_column: str = "text") -> None:
-        self.dataset = dataset
-        self.data_col = data_column
-        self.stats = Counter()
-        self.nlp_annotator = StanfordCoreNLP('http://localhost:9000')
-        
-    
-    def annotate_dataset(self, key: str):
-        """tokenize, ner, pos, depparse, parse"""
-
-        def annotate_batch(batch, key: str):
-            output = nlp.annotate(batch[self.data_col], properties = {
-                'annotators': 'tokenize, ssplit, pos, depparse, parse, ner',
-                'outputFormat': 'json'
-            })
-            batch[key] = output[key] ###?
-            return batch
-        
-        self.dataset = self.dataset.map(annotate_batch, fn_kwargs = {"key": key})
-
-    def found_the_most_popular(self, thr: int) -> List:
-        """Filtering the Counter"""
-        return list(x for x, count in self.stats.items() if count >= thr)  + ["other"]
-
-    def top_constituency(self, top_k: int = None): 
-
-        def search_levelwise(_tree: tree.Tree, depth: int = top_k): pass
-        
-        def batched_search(batch, top_k: int):
-            tmp_tree = tree.Tree.fromstring(batch["parse"])
-            """BFS"""
-            return batch
-            
-
