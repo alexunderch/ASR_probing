@@ -32,6 +32,16 @@ def prepare_probing_task(batch, feature_column: str):
     return batch
 
 
+def prepare_probing_task_(batch, feature_column: str):
+    frame_offset, num_frames = 16000, 16000
+    sp, sr = load(batch["path"], frame_offset = frame_offset, num_frames = num_frames)
+    resampler = transforms.Resample(sr, 16000)
+    batch['speech'] = resampler(sp).squeeze().numpy()
+    batch["sampling_rate"] = 16000
+    batch['len_speech'] = len(batch['speech'])
+    return batch
+
+
 ##timit
 def prepare_probing_task_timit(batch, feature_column: str):
     frame_offset, num_frames = 16000, 16000

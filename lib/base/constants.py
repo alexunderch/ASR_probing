@@ -25,3 +25,28 @@ class Constants:
     CHECKPOINTING_DIR = os.path.curdir
     PROFILING_DIR = os.path.join(os.path.curdir, 'tensorboards', 'profiling')
     CACHE_DIR = os.path.join(os.path.curdir, 'cache')
+
+
+
+top_contituencies = [
+    "ADVP_NP_VP_.",
+    "CC_ADVP_NP_VP_.",
+    "CC_NP_VP_.",
+    "IN_NP_VP_.",
+    "NP_ADVP_VP_.",
+    "NP_NP_VP_.",
+    "NP_PP_.",
+    "NP_VP_.",
+    "OTHER",
+    "PP_NP_VP_.",
+    "RB_NP_VP_.",
+    "SBAR_NP_VP_.",
+    "SBAR_VP_.",
+    "S_CC_S_.",
+    "S_NP_VP_.",
+    "S_VP_.",
+    "VBD_NP_VP_.",
+    "VP_.",
+    "WHADVP_SQ_.",
+    "WHNP_SQ_.",
+]

@@ -5,7 +5,7 @@ import torch
 
 from torch.utils import tensorboard
 from ..base.constants import Constants
-from ..func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2
+from ..func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2, prepare_probing_task_
 from ..base.utils import _lang, _make_directory_structure, DatasetSplit
 from ..base.processing import Processor
 from ..phoneme_utils import ASRDatasetProcessor
@@ -63,7 +63,7 @@ class SimpleASRPipeline(TaskTester):
                                             lang = lang,  split = DatasetSplit(dataset_split))
                     pipe.disable_cache()
                     if from_disk: assert isinstance(data_path, str)
-                    pipe.load_data(from_disk = from_disk, data_path = (morph_call if dataset_name is None else dataset_name) if not from_disk else data_path)
+                    pipe.load_data(from_disk = from_disk, data_path = (morph_call if dataset_name is None else dataset_name) if not from_disk else data_path, revision = "1.10.0")
                     data_proc = ASRDatasetProcessor(dataset_type=morph_call, model_path=model_path, 
                                                     feature_column=feature, tokenizer=tokenizer, dataset=pipe.dataset,
                                                     f_set = own_feature_set, only_custom_features = False)

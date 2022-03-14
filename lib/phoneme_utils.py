@@ -88,7 +88,7 @@ class ASRDatasetProcessor(DatasetProcessor):
             assert isinstance(drop_columns, list) or isinstance(drop_columns, str)
             if isinstance(drop_columns, str): self.task_data = self.task_data.remove_columns([drop_columns])
             elif isinstance(drop_columns, list): self.task_data = self.task_data.remove_columns(drop_columns)
-        self.task_data = self.task_data.remove_columns([self.feature_column, 'audio', 'speech', 'len_speech', 'sampling_rate'])
+        self.task_data = self.task_data.remove_columns([self.feature_column, 'speech', 'len_speech', 'sampling_rate'])
 
         if target_processing is not None:
             print_if_debug('target processing... (is ON)', self.cc.DEBUG)

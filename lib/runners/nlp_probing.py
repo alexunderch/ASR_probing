@@ -63,7 +63,7 @@ class SimpleNLPPipeline(object):
                                     lang = None, split = DatasetSplit(dataset_split))
             pipe.disable_cache()
             if not download_data: assert isinstance(data_path, str)
-            pipe.load_data(from_disk = True, data_path = dataset_name)
+            pipe.load_data(from_disk = True, data_path = dataset_name, **kwargs)
 
             print("The task title:", title)
             print(f"The features are: {data_proc.tok2label if data_proc.tok2label else pipe.f_set}")
@@ -77,5 +77,6 @@ class SimpleNLPPipeline(object):
             pipe.cleanup()
             if return_results: self.results.append(res)
         if not cc.DEBUG: clear_output(wait = True) 
+
 
 
