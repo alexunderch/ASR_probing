@@ -9,11 +9,11 @@ class Constants:
     DEBUG = False 
     PROFILING = False 
 
-    MODELS_PATH ={"common_voice": {"ru": "anton-l/wav2vec2-large-xlsr-53-russian",
-                                "fr": "facebook/wav2vec2-large-xlsr-53-french",
-                                "de": "facebook/wav2vec2-largee-xlsr-53-german",
-                                "es": "facebook/wav2vec2-large-xlsr-53-spanish"},
-                "timit_asr": {"None": "elgeish/wav2vec2-large-lv60-timit-asr"},
+    MODELS_PATH ={"common_voice": {"ru": ["anton-l/wav2vec2-large-xlsr-53-russian", "1.10.0"],
+                                "fr": ["facebook/wav2vec2-large-xlsr-53-french", "1.10.0"],
+                                "de": ["facebook/wav2vec2-largee-xlsr-53-german", "1.10.0"],
+                                "es": ["facebook/wav2vec2-large-xlsr-53-spanish", "1.10.0"]},
+                "timit_asr": {"None": ["elgeish/wav2vec2-large-lv60-timit-asr", "1.10.0"]},
                 "bert": {"None": "bert-large-cased"},
                 "t5": {"None": "t5-small"},
                 "roberta": {"None": "roberta-large-cased"}
@@ -28,25 +28,4 @@ class Constants:
 
 
 
-top_contituencies = [
-    "ADVP_NP_VP_.",
-    "CC_ADVP_NP_VP_.",
-    "CC_NP_VP_.",
-    "IN_NP_VP_.",
-    "NP_ADVP_VP_.",
-    "NP_NP_VP_.",
-    "NP_PP_.",
-    "NP_VP_.",
-    "OTHER",
-    "PP_NP_VP_.",
-    "RB_NP_VP_.",
-    "SBAR_NP_VP_.",
-    "SBAR_VP_.",
-    "S_CC_S_.",
-    "S_NP_VP_.",
-    "S_VP_.",
-    "VBD_NP_VP_.",
-    "VP_.",
-    "WHADVP_SQ_.",
-    "WHNP_SQ_.",
-]
+

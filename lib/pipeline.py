@@ -55,7 +55,7 @@ class Probing_pipeline:
 
         if from_disk:
             assert isinstance(data_path, str) 
-            self.dataset =  load_from_disk(data_path, **kwargs)
+            self.dataset =  load_from_disk(data_path)
             if self.split is not None and isinstance(self.dataset, DatasetDict): self.dataset = self.split.split_str(self.dataset)
         elif data_path is not None: 
             assert isinstance(data_path, str) 

@@ -50,7 +50,7 @@ class SimpleASRPipeline(TaskTester):
 
         _ = _make_directory_structure()
         for lang in dataset_language:
-            if model_path is None: model_path = cc.MODELS_PATH[morph_call][str(lang)] 
+            if model_path is None: model_path = cc.MODELS_PATH[morph_call][str(lang)][0] 
             for feature in features:
                 
                 for init_strategy in model_init_strategies:
@@ -63,7 +63,7 @@ class SimpleASRPipeline(TaskTester):
                                             lang = lang,  split = DatasetSplit(dataset_split))
                     pipe.disable_cache()
                     if from_disk: assert isinstance(data_path, str)
-                    pipe.load_data(from_disk = from_disk, data_path = (morph_call if dataset_name is None else dataset_name) if not from_disk else data_path, revision = "1.10.0")
+                    pipe.load_data(from_disk = from_disk, data_path = (morph_call if dataset_name is None else dataset_name) if not from_disk else data_path, revision = cc.MODELS_PATH[morph_call][str(lang)][-1])
                     data_proc = ASRDatasetProcessor(dataset_type=morph_call, model_path=model_path, 
                                                     feature_column=feature, tokenizer=tokenizer, dataset=pipe.dataset,
                                                     f_set = own_feature_set, only_custom_features = False)

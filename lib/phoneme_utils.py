@@ -10,12 +10,23 @@ from .base.processing import DatasetProcessor, Processor
 from .base.utils import print_if_debug
 from datasets import Dataset
 from .tokenizers import Wav2Vec2OProcessor
-from typing import Optional, Union, Dict
+from typing import Optional, Union, Dict, List
 from collections import Callable
 import os
 import numpy as np
+from copy import deepcopy
 
 #TODO: fix docs
+
+def comparison_dict(feature_lists: List[List]):
+    """Create a dict to compare two feature lists"""
+    count = 0
+    d = {d1_el: count for d1_el in feature_lists[0]}
+    for dl in feature_lists[1:]:
+        count += 1 
+        d.update({d2_el: count for d2_el in dl})
+    d.update({"other": count + 1})
+    return d    
 
 class ASRDatasetProcessor(DatasetProcessor):
     """Dataset wrapper for Huggingface ASR datasets"""
@@ -74,6 +85,8 @@ class ASRDatasetProcessor(DatasetProcessor):
         print_if_debug('reading files...', self.cc.DEBUG)
         if preprocessing_fn is not None:
             self.task_data = self.task_data.map(preprocessing_fn, fn_kwargs = {'feature_column': self.feature_column}, disable_nullable = False)
+            self.task_data = self.task_data.filter(lambda example: len(example["speech"]) > 0)
+
         print_if_debug('encoding features...', self.cc.DEBUG)
         self._filter_data(self.tok2label, self.only_custom_features)
         self.task_data = self.task_data.map(encode_labels, fn_kwargs = {'feature_column': self.feature_column})
@@ -88,7 +101,7 @@ class ASRDatasetProcessor(DatasetProcessor):
             assert isinstance(drop_columns, list) or isinstance(drop_columns, str)
             if isinstance(drop_columns, str): self.task_data = self.task_data.remove_columns([drop_columns])
             elif isinstance(drop_columns, list): self.task_data = self.task_data.remove_columns(drop_columns)
-        self.task_data = self.task_data.remove_columns([self.feature_column, 'speech', 'len_speech', 'sampling_rate'])
+        self.task_data = self.task_data.remove_columns(['speech', 'len_speech', 'sampling_rate'] + ([self.feature_column] if self.feature_column != "label" else []))
 
         if target_processing is not None:
             print_if_debug('target processing... (is ON)', self.cc.DEBUG)

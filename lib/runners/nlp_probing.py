@@ -38,7 +38,7 @@ class SimpleNLPPipeline(object):
                         is_prepared: bool = False,
                         **kwargs):
         cc = Constants
-        if model_path is None: model_path = cc.MODELS_PATH[dataset_name]["None"] 
+        if model_path is None: model_path = cc.MODELS_PATH[dataset_name]["None"][0]
 
         data_proc = NLPDatasetProcessor(dataset_type = morph_call, 
                                         model_path = model_path, 
