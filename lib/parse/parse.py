@@ -12,15 +12,7 @@ from collections import Counter
 
 #https://stanfordnlp.github.io/CoreNLP/download.html
 
-text = (
-  'Pusheen and Smitha walked along the beach. '
-  'Pusheen wanted to surf, but fell off the surfboard. '
-  'There is a big shit.')
-output = nlp.annotate(text, properties={
-  'annotators': 'tokenize,ssplit,pos,depparse,parse',
-  'outputFormat': 'json'
-  })
-
+#################################################################################################Helpers
 def tree_to_dict(tree):
     return {tree.label(): [tree_to_dict(t)  if isinstance(t, nltk.Tree) else t for t in tree]}
 
@@ -37,7 +29,7 @@ def get_labels_from_lca(ptree, lca_len, location):
         labels.append(ptree[location[:i]].label())
     return labels
 
-def findPath(ptree, text):
+def find_path_from_root(ptree, text):
     leaf_values = ptree.leaves()
     leaf_index1 = leaf_values.index(text)
     location = ptree.leaf_treeposition(leaf_index1)
@@ -73,8 +65,9 @@ def parse_paths(text, thr = 4):
     ptree = ParentedTree.fromstring(text)
     # ptree.pretty_print()
     paths = []
-    for leave in ptree.leaves(): paths.append("_".join(findPath(ptree, leave)[:thr]) + "_.")
+    for leave in ptree.leaves(): paths.append("_".join(find_path_from_root(ptree, leave)[:thr]) + "_.")
     return paths
+
 
 def get_constituency(batch, data_column: str, key: str):
     output = nlp.annotate(batch[data_column], properties = {'annotators': 'tokenize, ner, pos, depparse, parse',
@@ -87,6 +80,23 @@ def get_constituency(batch, data_column: str, key: str):
     return batch
 
 
+def collect_statistics(batch, labels: list):
+    """just flatten the sentences"""
+    labels.extend(batch["constituencies"])
+    return batch
+
+
+def label_map(batch, labels: dict):
+    """labeling dataset according to given labeling: from the most frequent to the least"""
+    batch["top_constituency"] = "OTHER"
+    for label in labels.keys():
+        if label in batch["constituencies"]: 
+            print(label,  batch["constituencies"])
+            batch["top_constituency"] = label
+            break
+    return batch
+#################################################################################################
+
 def prepare_dataset(dname: str, text_col: str):
     d = load_dataset(dname, split = "train")
     d = d.map(get_constituency, fn_kwargs = {"data_column": text_col, "key": "parse"})
@@ -97,12 +107,8 @@ _ = prepare_dataset("timit_asr", "text")
 def prepare_labels(dname_str:str):
     data = load_from_disk(dname_str)
     labels = list()
-    def collect_statistics(batch, ind):
-        labels.extend(batch["constituencies"])
-        print("help")
-        return batch
-    print(data)
-    data = data.map(collect_statistics, with_indices=True)
+
+    data = data.map(collect_statistics, fn_kwargs = {"labels": labels})
     stats = Counter(labels)
 
     def filter_(stats: Counter, low: int, high: int):
@@ -126,17 +132,7 @@ def prepare_labels(dname_str:str):
 
 def label_dataset(dname_str:str, labels: dict):
     data = load_from_disk(dname_str)
-    def label_map(batch):
-        print("help")
-
-        batch["top_constituency"] = "OTHER"
-        for label in labels.keys():
-            if label in batch["constituencies"]: 
-                print(label,  batch["constituencies"])
-                batch["top_constituency"] = label
-                break
-        return batch
-    return data.map(label_map)
+    return data.map(label_map, fn_kwargs = {"labels": labels})
 
 d = label_dataset("parsed_timit_asr_large", prepare_labels("parsed_timit_asr_large"))
 d.save_to_disk("parsed_timit_asr_large")
