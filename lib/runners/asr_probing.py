@@ -8,7 +8,8 @@ from ..base.constants import Constants
 from ..func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2, prepare_probing_task_
 from ..base.utils import _lang, _make_directory_structure, DatasetSplit
 from ..base.processing import Processor
-from ..phoneme_utils import ASRDatasetProcessor
+from ..phoneme_utils import ASRDatasetProcessor, comparison_dict
+from ..phoneme_utils import *
 from ..base.task import TaskTester
 from ..clf import ProberModel
 from ..probers import Prober, Wav2Vec2Prober

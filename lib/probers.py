@@ -1,6 +1,4 @@
-from ast import Str
-from base64 import encode
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, List, ByteString
 import torch
 from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration, T5EncoderModel
 from datasets import Dataset
@@ -22,7 +20,7 @@ if test_ipkernel(): from tqdm.notebook import tqdm
 else: from tqdm import tqdm
 
 class BertOProber(Prober):
-    def __init__(self, model_path: Union[Str, Dict], writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+    def __init__(self, model_path: Union[str, Dict], writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
         super().__init__(BertModel, model_path, writer, data, device, init_strategy)
         self.model.config.is_decoder = False
         if init_strategy is not None:
@@ -404,4 +402,68 @@ class T5EncoderDecoderProber(Prober):
             
 
         print_if_debug('done probes...', self.cc.DEBUG)
+        return probing_info
+
+class StackedEmbeddingsProber(Prober):
+    def __init__(self, embeddings: List[torch.TensorType], writer: torch.utils.tensorboard.SummaryWriter, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+        super().__init__(model_type = None, model_path = None, writer = writer, data = None, device = device, init_strategy = init_strategy)
+        self.stack = embeddings
+        if init_strategy is not None:
+            print_if_debug("reseting network parameters...", self.cc.DEBUG)
+            assert isinstance(init_strategy, str)
+            if init_strategy == "full": self.stack = [torch.normal(mean = 0.0, std = 1., size = s.size()) for s in embeddings]
+            else: print("No init with {} strategy".format(init_strategy))
+        self.writer = writer
+        self.data = None
+        self.device = device
+
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, save_outputs: bool = False, task_title: dict = None) -> dict:
+
+        def _prepare_data(batch):
+            """Helper function
+            """
+            labels = batch['label'].to(self.device)
+            inp_values = batch['input_values'].to(self.device)
+            return inp_values, labels
+
+        print_if_debug("stacking classifiers...", self.cc.DEBUG)
+
+        loss_fn = Loss(use_variational)
+
+        probing_info = {'loss': [], 'metrics': []}
+
+        model_config = {'in_size': self.stack[0].size(-1), 
+                        'hidden_size': 100,
+                        'out_size': len(torch.unique(self.data['label'])),
+                        'variational': use_variational,
+                        'device': self.device}
+
+        for ind, _ in enumerate(self.stack):
+            self.logger.log_string(f"emb {ind} of {len(self.stack)} in process")     
+
+            probing_model = LinearModel(**model_config).to(self.device)
+            probing_model.eval()
+            tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
+                         loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
+            print_if_debug("training...", self.cc.DEBUG)
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": ind})
+            
+
+            if save_outputs:
+                chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
+                                            task_title = "" if task_title is None else task_title['title'],
+                                            params = model_config, layer_idx = ind, optimizer = tr.optimizer)
+                print_if_debug("checkpoint {} saved...".format(chkpnt), self.cc.DEBUG)
+            
+            self._clear_cache()
+            print_if_debug("validating...", self.cc.DEBUG)
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": ind})            
+            probing_info['loss'].append(valid_loss)
+            probing_info['metrics'].append(valid_metrics) 
+            
+            probing_model = probing_model.cpu()
+            del probing_model
+            self.logger.log_string(self.profiler.rep + "\n")
+
+        print_if_debug('running probes...', self.cc.DEBUG)
         return probing_info

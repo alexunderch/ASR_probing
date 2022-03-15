@@ -32,7 +32,7 @@ class Prober:
         self.cc = Constants
         print_if_debug("downloading staff...", self.cc.DEBUG)
         self._activate_profilers()
-        self.model = model_type.from_pretrained(model_path, cache_dir = self.cc.CACHE_DIR).to(device)
+        if model_path is not None and model_type is not None: self.model = model_type.from_pretrained(model_path, cache_dir = self.cc.CACHE_DIR).to(device)
         self.writer = writer
         self.data = data
         self.device = device

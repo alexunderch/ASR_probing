@@ -1,6 +1,16 @@
 stops =  ["b", "d", "g", "p", "t", "k", "dx", "q"]  
 closed_stops = ["bcl", "dcl", "gcl", "pcl", "tck", "kcl"]   
 ####################################################################################
+affricates = ["jh", "ch"]
+closed_affricates = ["dcl", "tcl"]
+####################################################################################
+fricatives = ["s", "sh", "z", "zh", "f", "th"]
+####################################################################################
+nasals = ["m", "n", "ng", "em", "en", "eng", "nx"]
+
+####################################################################################
+semivowels_glides = ["l", "r", "w", "y", "hh", "hv", "el"]
+####################################################################################
 vowels = ["iy", "ih", "eh", "ey", "ae", "aa", "aw", "ay", "ah", "ao", "oy", "ow",
           "uh", "uw", "ux", "er", "ax", "ix", "axr", "ax-h"]
 ####################################################################################
@@ -18,14 +28,14 @@ from copy import deepcopy
 
 #TODO: fix docs
 
-def comparison_dict(feature_lists: List[List]):
+def comparison_dict(feature_lists: List[List], only_custom_features: bool = False):
     """Create a dict to compare two feature lists"""
     count = 0
     d = {d1_el: count for d1_el in feature_lists[0]}
     for dl in feature_lists[1:]:
         count += 1 
         d.update({d2_el: count for d2_el in dl})
-    d.update({"other": count + 1})
+    if only_custom_features: d.update({"other": count + 1})
     return d    
 
 class ASRDatasetProcessor(DatasetProcessor):
@@ -115,3 +125,116 @@ class ASRDatasetProcessor(DatasetProcessor):
 
             if _save_to_disk: self.task_data.save_to_disk(self.dname)
         return self.task_data
+
+
+# ARPABET was invented for English.
+# The standard dictionary written in ARPABET is the CMU dictionary.
+# TIMIT is written in a variant of ARPABET that includes a couple
+# of non-standard allophones, and most significantly, includes
+# separate symbols for the closure and release portions of each stop.
+#https://github.com/jhasegaw/phonecodes/blob/master/src/phonecode_tables.py
+
+
+_tone2ipa = {
+    'arz' : { '0':'', '1':'ˈ', '2':'ˌ' },
+    'eng' : { '0':'', '1':'ˈ', '2':'ˌ' },
+    'yue' : { '0':'', '1':'˥', '2':'˧˥', '3':'˧', '4':'˨˩', '5':'˩˧', '6':'˨' },
+    'lao' : { '0':'', '1':'˧', '2':'˥˧', '3':'˧˩', '4':'˥', '5':'˩˧', '6':'˩' },
+    'cmn' : { '0':'', '1':'˥', '2':'˧˥', '3':'˨˩˦', '4':'˥˩', '5':'' },
+    'spa' : { '0':'', '1':'ˈ', '2':'ˌ' },
+    'vie' : { '0':'', '1':'˧', '2':'˨˩h', '3':'˧˥', '4':'˨˩˨', '5':'˧ʔ˥', '6':'˧˨ʔ' },
+}
+       
+_arpabet2ipa = {
+    'AA':'ɑ',
+    'AE':'æ',
+    'AH':'ʌ',
+    'AH0':'ə',
+    'AO':'ɔ',
+    'AW':'aʊ',
+    'AY':'aɪ',
+    'EH':'ɛ',
+    'ER':'ɝ',
+    'ER0':'ɚ',
+    'EY':'eɪ',
+    'IH':'ɪ',
+    'IH0':'ɨ',
+    'IY':'i',
+    'OW':'oʊ',
+    'OY':'ɔɪ',
+    'UH':'ʊ',
+    'UW':'u',
+    'B':'b',
+    'CH':'tʃ',
+    'D':'d',
+    'DH':'ð',
+    'EL':'l̩ ',
+    'EM':'m̩',
+    'EN':'n̩',
+    'F':'f',
+    'G':'ɡ',
+    'HH':'h',
+    'JH':'dʒ',
+    'K':'k',
+    'L':'l',
+    'M':'m',
+    'N':'n',
+    'NG':'ŋ',
+    'P':'p',
+    'Q':'ʔ',
+    'R':'ɹ',
+    'S':'s',
+    'SH':'ʃ',
+    'T':'t',
+    'TH':'θ',
+    'V':'v',
+    'W':'w',
+    'WH':'ʍ',
+    'Y':'j',
+    'Z':'z',
+    'ZH':'ʒ'
+}
+_arpabet2ipa.update(_tone2ipa['eng'])   # Add the English stress labels
+_arpabet_vowels=set((k for k in _arpabet2ipa.keys() if k[0] in 'AEIOU'))
+
+_ipa2arpabet = { v: k for k, v in _arpabet2ipa.items() }
+_ipa2tone = {l:{v:k for k,v in d.items()} for l,d in _tone2ipa.items()}
+
+_timit2ipa = _arpabet2ipa.copy()
+_timit2ipa.update({
+    'AX':'ə',
+    'AX-H':'ə̥',
+    'AXR':'ɚ',
+    'B':'',
+    'BCL':'b',
+    'D':'',
+    'DCL':'d',
+    'DX':'ɾ',
+    'ENG':'ŋ̍',
+    'EPI':'',
+    'G':'',
+    'GCL':'g',
+    'HV':'ɦ',
+    'H#':'',
+    'IX':'ɨ',
+    'KCL':'k',
+    'K':'',
+    'NX':'ɾ̃',
+    'P':'',
+    'PAU':'',
+    'PCL':'p',
+    'T':'',
+    'TCL':'t',
+    'UX':'ʉ',
+})
+
+def convert_timit2ipa(batch):
+    batch["ipa"] = _timit2ipa[batch["utterance"].upper()]
+    return batch
+
+def convert():
+    from datasets import load_from_disk
+    d = load_from_disk("../phonetic_set")
+    d = d.map(convert_timit2ipa)
+    d.save_to_disk("../phonetic_set")
+

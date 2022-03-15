@@ -54,7 +54,7 @@ class SimpleNLPPipeline(object):
         _ = _make_directory_structure()
 
         for init_strategy in model_init_strategies:
-            title = dataset_name + "_" 'lang=en_' + feature + "_task_random=" + str(init_strategy) +\
+            title = dataset_name + "_en_" + feature + "_task_random=" + str(init_strategy) +\
                     "_grads="  +str(enable_grads) + "_variational=" + str(use_mdl)
             writer = SummaryWriter(os.path.join(cc.LOGGING_DIR, title, 
                                   "layers={}-{}".format(layers[0], layers[-1]) if isinstance(layers, list) else f"layers={layers}"))
