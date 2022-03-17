@@ -16,6 +16,36 @@ vowels = ["iy", "ih", "eh", "ey", "ae", "aa", "aw", "ay", "ah", "ao", "oy", "ow"
 ####################################################################################
 others = ["pau", "h#"]
 
+ipa_voiced = set(['b', 'd', 'dʒ', 'j', 'l', 'm', 'n', 'v', 'w', 'z', 'ɡ', 'ɲ', 'əl', 'ɹ', 'ɾ', 'ʒ', 'ŋ', 'ð'])
+ipa_voiceless = set(['f', 'h', 'k', 'p', 's', 't', 'ts', 'tʃ', 'ʃ', 'θ'])
+ipa_vowels = set(['ɪ', 'uː', 'ʌ', 'iː', 'ɛ', 'ɑː', 'ə', 'i', 'oʊ', 'æ', 'ɐ', 'aʊ', 'ʊ', 'aɪ', 'eɪ', 'oː', 'a', 'oɪ', 'ɔ', 'ɚ', 'eː', 'ᵻ'])
+ipa_consonants = ipa_voiced.union(ipa_voiceless)
+ipa_stops = set(['b', 'd', 'k', 'p', 't', 'ɡ'])
+ipa_fricatives = set(['f', 'h', 's', 'v', 'z', 'ð', 'θ'])
+ipa_sibilants = set(['ʒ', 'ʃ'])
+ipa_affricates = set(['ch', 'ts', 'tʃ', 'dʒ'])
+ipa_approximants = set(['l', 'j', 'w', 'əl'])
+ipa_trills = set(['ɹ', 'ɾ'])
+ipa_nasal = set(['n', 'm', 'ŋ', 'ɲ'])
+ipa_soft = set(['dʲ', 'j', 'mʲ', 'nʲ', 'rʲ', 'sʲ', 'tʃ', 'tʲ', 'ɕ', 'ɭʲ'])
+ipa_hard = ipa_consonants - ipa_soft
+
+
+ipa_hardcoded = set(['ŋ', 'j', 'h', 'ɹ', 'dʒ', 'v', 'n', 'g', 'ɾ̃', 'aɪ', 'eɪ', 'p', 'n̩', 'z', 's', 'ɝ', 'ŋ̍', 'l̩ ', \
+             'ɔ', 't', 'ð', 'aʊ', 'tʃ', 'ʉ', 'i', 'ʌ', 'd', 'k', 'ɑ', 'ʒ', 'ʊ', 'ɦ', 'f', 'ɚ', 'ɾ', 'm̩', 'ʃ', \
+             'ə', 'θ', 'w', 'ɔɪ', 'ə̥', 'ɨ', 'æ', 'ʔ', 'ɛ', 'b', 'ɪ', 'm', 'u', 'l', 'oʊ'])
+
+ipa_all = [list(ipa_hardcoded.intersection(ipa_voiced)), 
+           list(ipa_hardcoded.intersection(ipa_voiceless)), 
+           list(ipa_hardcoded.intersection(ipa_stops)), 
+           list(ipa_hardcoded.intersection(ipa_fricatives)), 
+           list(ipa_hardcoded.intersection(ipa_affricates)), 
+           list(ipa_hardcoded.intersection(ipa_sibilants)), 
+           list(ipa_hardcoded.intersection(ipa_trills)), 
+           list(ipa_hardcoded.intersection(ipa_approximants)), 
+           list(ipa_hardcoded.intersection(ipa_nasal))]
+
+
 from .base.processing import DatasetProcessor, Processor
 from .base.utils import print_if_debug
 from datasets import Dataset
@@ -60,10 +90,11 @@ class ASRDatasetProcessor(DatasetProcessor):
 
         """
         self.task_data = self.task_data.filter(lambda example: len(example[self.feature_column].strip()) > 0)
+        self.f_set = None
         if own_feature_set is None: self.f_set = {v: k for k, v in enumerate(list(set(self.task_data[self.feature_column])))}
         else: 
             assert isinstance(own_feature_set, dict)
-            self.f_set = own_feature_set            
+            self.f_set = deepcopy(own_feature_set)            
             if not only_custom_features:
                 self.f_set["other"] = np.max(list(self.f_set.values())) + 1
                 def foo(batch):
