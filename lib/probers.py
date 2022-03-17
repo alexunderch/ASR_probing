@@ -441,7 +441,10 @@ class StackedEmbeddingsProber(Prober):
         for ind, _ in enumerate(self.stack):
             self.logger.log_string(f"emb {ind} of {len(self.stack)} in process")     
 
-            probing_model = LinearModel(**model_config).to(self.device)
+            probing_model = prober(parent_model = torch.nn.Identity(self.stack[0].size(-1)),
+                        clf = LinearModel(**model_config),
+                        enable_grads = enable_grads,
+                        ).to(self.device)
             probing_model.eval()
             tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
                          loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)

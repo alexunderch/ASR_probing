@@ -1,3 +1,4 @@
+from cmath import pi
 from collections import Callable
 from typing import Union, List, Dict
 import os
@@ -6,7 +7,7 @@ import torch
 from torch.utils import tensorboard
 from ..base.constants import Constants
 from ..func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2, prepare_probing_task_
-from ..base.utils import _lang, _make_directory_structure, DatasetSplit
+from ..base.utils import _lang, _make_directory_structure, DatasetSplit, f_set
 from ..base.processing import Processor
 from ..phoneme_utils import ASRDatasetProcessor, comparison_dict
 from ..phoneme_utils import *
@@ -70,6 +71,9 @@ class SimpleASRPipeline(TaskTester):
                                                     f_set = own_feature_set, only_custom_features = False)
                     
                     pipe.dataset = data_proc.process_dataset(preprocessing_fn=preprocessing_fn)
+                    print(set(pipe.dataset['label']))
+                    print(set(data_proc.f_set.values()))
+
                     print("The task title:", title)
                     res = pipe.run_probing(model2probe, probing_fn, layers = layers, enable_grads = enable_grads, 
                                 use_variational = use_mdl, 
