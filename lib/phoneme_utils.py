@@ -35,15 +35,15 @@ ipa_hardcoded = set(['ŋ', 'j', 'h', 'ɹ', 'dʒ', 'v', 'n', 'g', 'ɾ̃', 'aɪ', 
              'ɔ', 't', 'ð', 'aʊ', 'tʃ', 'ʉ', 'i', 'ʌ', 'd', 'k', 'ɑ', 'ʒ', 'ʊ', 'ɦ', 'f', 'ɚ', 'ɾ', 'm̩', 'ʃ', \
              'ə', 'θ', 'w', 'ɔɪ', 'ə̥', 'ɨ', 'æ', 'ʔ', 'ɛ', 'b', 'ɪ', 'm', 'u', 'l', 'oʊ'])
 
-ipa_all = [list(ipa_hardcoded.intersection(ipa_voiced)), 
-           list(ipa_hardcoded.intersection(ipa_voiceless)), 
-           list(ipa_hardcoded.intersection(ipa_stops)), 
+ipa_all = [list(ipa_hardcoded.intersection(ipa_stops)), 
            list(ipa_hardcoded.intersection(ipa_fricatives)), 
            list(ipa_hardcoded.intersection(ipa_affricates)), 
            list(ipa_hardcoded.intersection(ipa_sibilants)), 
            list(ipa_hardcoded.intersection(ipa_trills)), 
            list(ipa_hardcoded.intersection(ipa_approximants)), 
            list(ipa_hardcoded.intersection(ipa_nasal))]
+
+
 
 
 from .base.processing import DatasetProcessor, Processor
