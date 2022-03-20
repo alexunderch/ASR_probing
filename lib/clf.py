@@ -31,3 +31,10 @@ class ProberModel(torch.nn.Module):
         out = self.pooling_layer(out.transpose(1, 2)).transpose(1, 2)
         out = self.clf(out.reshape(out.size(0), -1))
         return out
+
+class CTCProberModel(ProberModel):
+    def __init__(self, parent_model, clf, enable_grads: bool, encoder_decoder: bool = False, blank_token: int = 0):
+        super().__init__(parent_model = parent_model, clf = clf, enable_grads = enable_grads, encoder_decoder = encoder_decoder)
+        self.blank_token = blank_token
+    def forward(self, inp, att):
+        super().forward(inp, att)

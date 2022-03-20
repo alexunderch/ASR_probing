@@ -1,3 +1,4 @@
+from email.mime import base
 from opcode import hasconst
 from .constants import Constants
 import torch
@@ -11,15 +12,18 @@ class KL:
     accumulated_kl_div = 0
 
 class Loss:
-    def __init__(self, variational: bool = True):
+    def __init__(self, variational: bool = True, ctc = False):
         self.variational = variational
+        self.ctc = ctc
     def __call__(self, y_true, y_pred, model = None):
+        if self.ctc: base_loss = torch.nn.CTCLoss()
+        else: base_loss = torch.nn.CrossEntropyLoss()
         if self.variational:
-            reconstruction_error = torch.nn.CrossEntropyLoss()(y_pred, y_true)
+            reconstruction_error = base_loss(y_pred, y_true)
             kl = model.accumulated_kl_div
             model.reset_kl_div()
             return reconstruction_error + kl
-        else: return torch.nn.CrossEntropyLoss()(y_pred, y_true)
+        else: return base_loss(y_pred, y_true)
 
 class LinearVariational(torch.nn.Module):
     def __init__(self, in_features: int, out_features: int, parent, bias: bool=True, device: torch.device = torch.device('cpu')) -> None:

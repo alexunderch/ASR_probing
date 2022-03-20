@@ -53,6 +53,7 @@ from .tokenizers import Wav2Vec2OProcessor
 from typing import Optional, Union, Dict, List
 from collections import Callable
 import os
+import torch
 import numpy as np
 from copy import deepcopy
 
@@ -258,6 +259,16 @@ _timit2ipa.update({
     'TCL':'t',
     'UX':'ʉ',
 })
+
+def convert_labels2ipa(labels: torch.Tensor, vocab: dict, target_vocab: dict = None):
+    """Converting labels to target vocab labels if needed"""
+    _array = list()
+    for _arr_el in labels.numpy():
+        l  = vocab[_arr_el]
+        _array.append(target_vocab[l] if target_vocab else l)
+    return torch.from_numpy(np.array(_array))
+
+
 
 def convert_timit2ipa(batch):
     batch["ipa"] = _timit2ipa[batch["utterance"].upper()]

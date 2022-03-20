@@ -97,7 +97,7 @@ class BertOProber(Prober):
         return probing_info
 
 class Wav2Vec2Prober(Prober):
-    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None, phoneme = False) -> None:
 
         super().__init__(Wav2Vec2ForCTC, model_path, writer, data, device, init_strategy)
         self.model.config.is_decoder = False
@@ -115,6 +115,7 @@ class Wav2Vec2Prober(Prober):
         self.writer = writer
         self.data = data
         self.device = device
+        self.use_ctc = phoneme
 
     def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
         self.model.freeze_feature_extractor()
@@ -153,7 +154,7 @@ class Wav2Vec2Prober(Prober):
         else:
             print_if_debug("stacking classifiers...", self.cc.DEBUG)
 
-            loss_fn = Loss(use_variational)
+            loss_fn = Loss(use_variational, ctc = self.use_ctc)
 
             probing_info = {'loss': [], 'metrics': []}
 
@@ -162,10 +163,13 @@ class Wav2Vec2Prober(Prober):
             
             model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO, 
                             'hidden_size': 100,
-                            'out_size': len(torch.unique(self.data['label'])),
+                            'ctc': True,
+                            'out_size': self.model.config.vocab if self.use_ctc 
+                                                                else len(torch.unique(self.data['label'])),
                             'variational': use_variational,
                             'device': self.device}
 
+            if not self.use_ctc: del model_config['ctc']
             for layer in tqdm(layers, total = len(layers)):
                 self.logger.log_string(f"layer {layer} of {len(layers)} in process")     
 
@@ -206,6 +210,7 @@ class Wav2Vec2Prober(Prober):
 
         print_if_debug('running probes...', self.cc.DEBUG)
         return probing_info
+
 
 class T5EncoderProber(Prober):
     def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
@@ -404,6 +409,9 @@ class T5EncoderDecoderProber(Prober):
         print_if_debug('done probes...', self.cc.DEBUG)
         return probing_info
 
+
+
+###########MAINTENANCE
 class StackedEmbeddingsProber(Prober):
     def __init__(self, embeddings: List[torch.TensorType], writer: torch.utils.tensorboard.SummaryWriter, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
         super().__init__(model_type = None, model_path = None, writer = writer, data = None, device = device, init_strategy = init_strategy)

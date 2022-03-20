@@ -43,11 +43,12 @@ class Trainer():
     """This class provides main train and validation functions"""
     def __init__(self, model: torch.nn.Module, logger: MyLogger, profiler: ProbingProfiler, writer: torch.utils.tensorboard.SummaryWriter, 
                        loss_function: Loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, 
-                       device: torch.device, callback = None, lr: float = 1e-2) -> None:
+                       device: torch.device, callback = None, lr: float = 1e-2, processor: Callable = None) -> None:
 
       """
       Args:
         model, class inherited of nn.Module
+        processor, a processor needed for CTC decoding
         logger, MyLogger: own logger class instance
         profiler, ProbingProfiler: profiler
         writer, torch.utils.tensorboard.SummaryWriter: tensorboard default writer
@@ -59,6 +60,7 @@ class Trainer():
       """
       self.model =  model.to(device)
       self.loss_function = loss_function
+      self.processor = processor
       self.optimizer = optimizer(self.model.parameters(), lr = lr)
       self.scheduler = scheduler(self.optimizer, T_max = 10)
       self.callback = callback
@@ -112,12 +114,13 @@ class Trainer():
         return np.mean(train_loss)
 
     @torch.no_grad()
-    def valid_epoch(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, metrics: callable) -> Tuple:
+    def valid_epoch(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, metrics: callable, output_convert_fn: Callable = None, **kwagrs) -> Tuple:
         """Args:
             valid_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
             prof, ProbingProfiler instance 
             metrics, callable: own callable metrics
+            output_convert_fn: a Callable output processor for non-auxillary tasks
         Returns: 
             valid_loss_per_loader: float, value of loss_fn on the batch of data
             valid_metrics_per_loader: float, value of metrics_fn on the batch of data
@@ -133,9 +136,37 @@ class Trainer():
             prof.step()
             
         return np.mean(valid_loss), np.mean(valid_metrics)
+
+    @torch.no_grad()
+    def valid_epoch_ctc(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, output_convert_fn: Callable, prof: ProbingProfiler, metrics: callable, **kwagrs) -> Tuple:
+        """Args:
+            valid_loader, torch.utils.data.DataLoader
+            batch_processing_fn, callable: a function for processing each batch
+            prof, ProbingProfiler instance 
+            metrics, callable: own callable metrics
+            output_convert_fn: a Callable output processor for non-auxillary tasks
+        Returns: 
+            valid_loss_per_loader: float, value of loss_fn on the batch of data
+            valid_metrics_per_loader: float, value of metrics_fn on the batch of data
+                """
+        _ = self.model.eval()
+        valid_loss, valid_metrics = [], []
+        for it, batch in tqdm(enumerate(valid_loader), total = len(valid_loader)):
+            inputs, attention_masks, labels = batch_processing_fn(batch)
+            output = self.model(inputs, attention_masks)
+                        
+            predicted_promt = output_convert_fn(torch.argmax(output.detach().cpu(), dim = -1), **kwagrs)
+            labels = output_convert_fn(labels.detach().cpu(), **kwagrs)
+
+            batch_loss = self.loss_function(labels, predicted_promt, self.model.clf)
+            valid_loss.append(batch_loss.detach().cpu().item())
+            valid_metrics.append(metrics(predicted_promt, labels))
+            prof.step()
+            
+        return np.mean(valid_loss), np.mean(valid_metrics)
     
 
-    def train(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, count_of_epoch: int, info: dict):
+    def train(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, count_of_epoch: int, info: dict, **kwagrs):
         """
         Trainer of the model;  uses `train_epoch` method
         Args:
@@ -163,12 +194,13 @@ class Trainer():
 
 
     @torch.no_grad()
-    def validate(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, metrics: Callable, info: dict) -> Tuple:
+    def validate(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, metrics: Callable, info: dict, output_convert_fn: Callable = None, **kwagrs) -> Tuple:
         """Args:
             valid_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
             metrics, callable: own callable metrics
             info, dict: some auxillary info
+            output_convert_fn: a Callable output processor for non-auxillary tasks
         Returns: 
             valid_loss: float, value of loss_fn on the batch of data
             valid_metrics: float, value of metrics_fn on the batch of data
@@ -177,7 +209,7 @@ class Trainer():
         self.model.eval()
         self.logger.log_string(f"validating...")
         with self.profiler.profile('validation') as prof:
-            valid_loss, valid_metrics = self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics)
+            valid_loss, valid_metrics = self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics, output_convert_fn = output_convert_fn, **kwagrs)
             self.writer.add_scalar("valid loss", valid_loss, info['layer'])
             self.writer.add_scalar(f"valid {metrics.name}", valid_metrics, info['layer'])
 

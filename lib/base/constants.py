@@ -16,7 +16,8 @@ class Constants:
                 "timit_asr": {"None": ["elgeish/wav2vec2-large-lv60-timit-asr", "1.10.0"]},
                 "bert": {"None": "bert-large-cased"},
                 "t5": {"None": "t5-small"},
-                "roberta": {"None": "roberta-large-cased"}
+                "roberta": {"None": "roberta-large-cased"},
+                "wav2vec2phonemes": {"None": "facebook/wav2vec2-xlsr-53-espeak-cv-ft"}
                 }
 
     TIMIT_METADATA_PATH = os.path.join(os.path.curdir, 'timit_features_proc.csv')

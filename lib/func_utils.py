@@ -1,6 +1,7 @@
 from torchaudio import load, transforms
 import re
 import pickle
+from transformers import Wav2Vec2Processor
 import pandas as pd
 import numpy as np
 import torch
@@ -66,21 +67,17 @@ def prepare_probing_task_timit_2(batch, feature_column: str):
     batch[feature_column] = str(val[0]) if len(val) else "other" 
     return batch
 
+import re
 
-def plotting_fn(data, config: dict):
-    if not cc.DEBUG: clear_output(wait = True)
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.set_title(config['title'])
-    used_metrics = config['metrics']
-    if len(used_metrics) == 1: data = np.array(data)[..., np.newaxis]
-    assert len(used_metrics) == data.shape[1]
-    for ind in range(data.shape[1]): 
-        ax.plot(np.arange(0, len(data), 1), data[:, ind], marker = '.', color = 'red', lw = 2, label = used_metrics[ind])
-    ax.legend(loc = 'best')
-    ax.set_ylabel('metrics'); ax.set_xlabel('#layer')
-    ax.grid(True)
-    if config['save_path'] is not None:
-        assert isinstance(config['save_path'], str)
-        pickle.dump(fig, open(config['save_path'] + config['title'] + '.pickle', 'wb'))
+def remove_special_characters_and_preprocess(batch, preprocessor: Wav2Vec2Processor, max_len: int = 100):
+    chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
+    batch["text"] = re.sub(chars_to_ignore_regex, '', batch["text"]).lower()
 
+    with preprocessor.as_target_processor():
+        label_batch = preprocessor.pad(batch['text'],
+                                       padding = "max_length",
+                                       max_length = max_len,
+                                       return_tensors = "pt")
+    batch['label'] = label_batch["input_ids"]
+
+    return batch
