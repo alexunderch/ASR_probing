@@ -1,6 +1,9 @@
 from typing import Dict, Union
 from .base.utils import NumpyEncoder, print_if_debug, DatasetSplit
 from .base.constants import Constants
+from .base.processing import Processor
+from .phoneme_utils import *
+
 
 from .base.prober import Prober
 import torch
@@ -41,6 +44,7 @@ class Probing_pipeline:
         self.dataset = data
         self.device = device
         self.f_set = None
+        self.kwargs_for_ctc = {}
     
 
     def load_data(self, from_disk: bool, data_path: str = None, **kwargs) -> None:
@@ -63,6 +67,7 @@ class Probing_pipeline:
                                         **kwargs)
             self.dataset = self.split.split_str(self.dataset)         
         else: assert self.dataset is not None
+        
         # if data_column == 'speech': self.dataset = self.dataset.cast_column("audio", Audio(sampling_rate = 16_000))
         # self.own_feature_set = own_feature_set; self.only_custom_features = only_custom_features
 
@@ -71,9 +76,12 @@ class Probing_pipeline:
     def get_feature_set(self): 
         """All labels """
         return self.f_set
+
+    def _define_dataprocessor_utils(self, proc: Processor, output_convert_fn: Callable, target_vocab: dict) -> None:
+        self.dataprocessor = proc
     
     def run_probing(self, probing_taskk: Prober, probing_fn, layers: list, checkpoint_path: Union[str, Dict] = None, enable_grads = False, use_variational: bool = False, init_strategy: str = None, plotting_fn: Callable = None, 
-                    save_checkpoints: bool = False, plotting_config: dict = None, **kwargs) -> dict:
+                    save_checkpoints: bool = False, plotting_config: dict = None, use_ctc_objective: bool = False, model_vocab: int = None, **kwargs) -> dict:
         """Main probing runner
         Args:
            probing_taskk, Prober: an instance of Prober class (model to be probed)
@@ -89,11 +97,18 @@ class Probing_pipeline:
            save_checkpoints, bool: an optional flag, whether to save checkpoints
                                    defalult = False
            plotting_config, dict ({"title": str, "metrics": list of used in pro bing fn metrics, "save_path": str}), default = None
+           use_ctc_objective, bool: used fot Wav2Vec2 probing only (an optional flag whether to use CE or CTC)
+                                    default = False
+           model_vocab: int: a number to update model vocab size
+                             default = None
         """
         probing_task = probing_taskk(self.model_path, self.writer, data = self.dataset, init_strategy = init_strategy, device = self.device)
+        if model_vocab: probing_task.model.config.vocab_size = model_vocab
+        
+        print_if_debug(f"CTC used:{use_ctc_objective}", self.cc.DEBUG) 
+        if hasattr(probing_task, "use_ctc"): probing_task.use_ctc = use_ctc_objective
         probing_task.get_resources(load_data = False, checkpoint_path = checkpoint_path, batch_size = self.cc.BATCH_SIZE, **kwargs)
        
-
         probing_results = probing_task.make_probe(probing_fn, use_variational = use_variational, enable_grads = enable_grads, layers = layers, 
                                                   save_outputs = save_checkpoints, task_title = plotting_config)
         

@@ -1,11 +1,12 @@
 from typing import Dict, Tuple, Union, List, ByteString
+from xml.parsers.expat import model
 import torch
 from transformers import Wav2Vec2ForCTC, BertModel, T5ForConditionalGeneration, T5EncoderModel
 from datasets import Dataset
 from .base.utils import print_if_debug
 from .base.constants import Constants
 from .base.trainer import Trainer, F1Score
-from .base.layers import LinearModel, Loss
+from .base.layers import LinearModel, Loss, CTCLikeLoss
 
 from .base.prober import Prober
 import os
@@ -97,7 +98,7 @@ class BertOProber(Prober):
         return probing_info
 
 class Wav2Vec2Prober(Prober):
-    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None, phoneme = False) -> None:
+    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
 
         super().__init__(Wav2Vec2ForCTC, model_path, writer, data, device, init_strategy)
         self.model.config.is_decoder = False
@@ -115,9 +116,8 @@ class Wav2Vec2Prober(Prober):
         self.writer = writer
         self.data = data
         self.device = device
-        self.use_ctc = phoneme
-
-    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None) -> dict:
+    
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [1], from_memory = None, save_outputs: bool = False, task_title: dict = None, **kwargs) -> dict:
         self.model.freeze_feature_extractor()
         self.fixed_encoder = self.model.wav2vec2.encoder.layers.cpu()
         assert np.alltrue([l > 0 and l <= len(self.fixed_encoder) for l in layers])
@@ -137,7 +137,7 @@ class Wav2Vec2Prober(Prober):
         def _prepare_data(batch):
             """Helper function
             """
-            labels = batch['label'].to(self.device)
+            labels = batch['label'][0].to(self.device) if self.use_ctc else batch['label'].to(self.device)
             inp_values, att_masks =  batch['input_values'][0].to(self.device), batch['attention_mask'][0].to(self.device)
             #getting ready tp encoder
             with torch.no_grad(): 
@@ -154,22 +154,19 @@ class Wav2Vec2Prober(Prober):
         else:
             print_if_debug("stacking classifiers...", self.cc.DEBUG)
 
-            loss_fn = Loss(use_variational, ctc = self.use_ctc)
+            loss_fn = Loss(use_variational, ctc = self.use_ctc,  
+                           blank_token = self.model.config.pad_token_id)
 
             probing_info = {'loss': [], 'metrics': []}
 
-            inputs, attention_masks, _ = _prepare_data(iter(self.dataloader).next())
-
-            
-            model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO, 
+            inputs, attention_masks, labels = _prepare_data(iter(self.dataloader).next())
+            self.cc.POOLING_TO = labels.size(1) if self.use_ctc else self.cc.POOLING_TO
+            model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO if not self.use_ctc else self.model.config.hidden_size, 
                             'hidden_size': 100,
-                            'ctc': True,
-                            'out_size': self.model.config.vocab if self.use_ctc 
-                                                                else len(torch.unique(self.data['label'])),
+                            'out_size': self.model.config.vocab_size if self.use_ctc else len(torch.unique(self.data['label'])),
                             'variational': use_variational,
                             'device': self.device}
 
-            if not self.use_ctc: del model_config['ctc']
             for layer in tqdm(layers, total = len(layers)):
                 self.logger.log_string(f"layer {layer} of {len(layers)} in process")     
 
@@ -180,15 +177,17 @@ class Wav2Vec2Prober(Prober):
 
                 probing_model = prober(parent_model = self.model.wav2vec2.encoder,
                                        clf = LinearModel(**model_config),
-                                       enable_grads = enable_grads
+                                       enable_grads = enable_grads,
                                        ).to(self.device)
-                                       
+                
+                probing_model.use_ctc = self.use_ctc                       
                 probing_model.eval()
+
                 self.writer.add_graph(probing_model, input_to_model = [inputs, attention_masks])
                 tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
-                         loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
+                         loss_function = loss_fn, optimizer = torch.optim.AdamW, scheduler = None, device = self.device, lr = 3 * 1e-3, **kwargs)
                 print_if_debug("training...", self.cc.DEBUG)
-                _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
+                _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer, 'ctc': self.use_ctc})
                 
 
                 if save_outputs:
@@ -199,8 +198,10 @@ class Wav2Vec2Prober(Prober):
                 
                 self._clear_cache()
                 print_if_debug("validating...", self.cc.DEBUG)
-                valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
+                valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, 
+                                                        metrics = F1Score(task_title["metrics"]), info = {"layer": layer, "ctc": self.use_ctc})            
                 probing_info['loss'].append(valid_loss)
+
                 probing_info['metrics'].append(valid_metrics)
 
                

@@ -1,6 +1,5 @@
 from .base.constants import Constants
 import torch
-from torch import nn
 from .base.layers import *
 
 class ProberModel(torch.nn.Module):
@@ -8,10 +7,11 @@ class ProberModel(torch.nn.Module):
         super().__init__()
         cc = Constants
         self.parent_model = parent_model
-        self.pooling_layer = torch.nn.AdaptiveAvgPool1d(output_size = cc.POOLING_TO)
+        
         self.clf = clf
         self.enable_grads = enable_grads
         self.encoder_decoder = encoder_decoder
+        self.use_ctc = False
     def forward(self, inp, att):
         if hasattr(self.parent_model, "decoder"): 
               parent_out = lambda e_inp, e_att: self.parent_model(e_inp, attention_mask = e_att, decoder_input_ids = e_inp,
@@ -26,15 +26,9 @@ class ProberModel(torch.nn.Module):
             if hasattr(self.parent_model, "decoder"):  out = out.encoder_last_hidden_state
             else: out = out.last_hidden_state
         else: out = out.decoder_hidden_states[-1]
-
-
         out = self.pooling_layer(out.transpose(1, 2)).transpose(1, 2)
-        out = self.clf(out.reshape(out.size(0), -1))
-        return out
 
-class CTCProberModel(ProberModel):
-    def __init__(self, parent_model, clf, enable_grads: bool, encoder_decoder: bool = False, blank_token: int = 0):
-        super().__init__(parent_model = parent_model, clf = clf, enable_grads = enable_grads, encoder_decoder = encoder_decoder)
-        self.blank_token = blank_token
-    def forward(self, inp, att):
-        super().forward(inp, att)
+        if not self.use_ctc: 
+            out = self.clf(out.reshape(out.size(0), -1))
+            return out
+        else:  return torch.nn.functional.log_softmax(self.clf(out))

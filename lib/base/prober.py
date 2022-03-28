@@ -4,6 +4,7 @@ from datasets import Dataset, DatasetDict
 from .profilers import CheckPointer, ProbingProfiler, MyLogger
 from .utils import print_if_debug
 from .constants import Constants
+from .processing import Processor
 
 import os
 import gc
@@ -13,7 +14,7 @@ from typing import Dict, Union
 
 
 class Prober:
-    def __init__(self, model_type, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
+    def __init__(self, model_type, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, data: Dataset = None, device: torch.device = torch.device('cpu'), init_strategy: str = None, phoneme: bool = False) -> None:
         """ Probing tasks class.
         Args:
             model_type, a HuggingFace model class to probe
@@ -27,7 +28,8 @@ class Prober:
                                 -- (only) encoder
                                 -- (only) feature_extractors
                                 default = None
-            init_func, callable: a function which has args: a model and a strategy and returns None
+            phoneme, bool: whether to do CTC probing or CE probing
+                           default = False
         """
         self.cc = Constants
         print_if_debug("downloading staff...", self.cc.DEBUG)
@@ -36,6 +38,8 @@ class Prober:
         self.writer = writer
         self.data = data
         self.device = device
+        self.use_ctc = phoneme
+        self.dataprocessor = None
 
     def _activate_profilers(self):
         self.writer = None
@@ -44,6 +48,10 @@ class Prober:
         self.profiler = ProbingProfiler(self.cc.CHECKPOINTING_DIR)
         self.profiler.on() if self.cc.PROFILING else self.profiler.off() 
         self.profiler.profile()
+
+    def _define_dataprocessor(self, proc: Processor) -> None: 
+        """Assigning a tokenizer used for CTC-training."""
+        self.dataprocessor = proc
 
     def get_resources(self, load_data: bool = False, data_path: str = None, checkpoint_path: Union[str, Dict] = None, batch_size: int = 100, 
                       poisoning_ratio: float = 0, poisoning_mapping: Callable = None, **kwargs) -> None:
@@ -96,15 +104,17 @@ class Prober:
         self.data.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
 
         splitted_dataset = self.data.train_test_split(test_size = 0.25, seed = 42)
-        weights = 1. / np.bincount(splitted_dataset['train']['label'])
-        self.class_weight = np.array([weights[l] for l in splitted_dataset['train']['label']])
+        if not self.use_ctc:    
+            weights = 1. / np.bincount(splitted_dataset['train']['label'])
+            self.class_weight = np.array([weights[l] for l in splitted_dataset['train']['label']])
+            test_weights = 1. / np.bincount(splitted_dataset['test']['label'])
+
         self.dataloader = torch.utils.data.DataLoader(splitted_dataset['train'], batch_size = batch_size,
-                                                      sampler = torch.utils.data.WeightedRandomSampler(self.class_weight, len(self.class_weight)))
+                                                      sampler = torch.utils.data.WeightedRandomSampler(self.class_weight, len(self.class_weight)) if not self.use_ctc else None)
         
-        test_weights = 1. / np.bincount(splitted_dataset['test']['label'])
         self.validloader = torch.utils.data.DataLoader(splitted_dataset['test'], batch_size = batch_size,
                                                       sampler = torch.utils.data.WeightedRandomSampler(np.array([test_weights[l] for l in splitted_dataset['test']['label']]),
-                                                                                                       len(splitted_dataset['test']['label'])))
+                                                                                                       len(splitted_dataset['test']['label'])) if not self.use_ctc else None)
     def _clear_cache(self):
          if self.device.type == 'cuda':
             with torch.no_grad(): torch.cuda.empty_cache()

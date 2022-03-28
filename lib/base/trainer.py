@@ -1,5 +1,7 @@
 #TODO DOCUMENTATION!!!!!!
 
+from cProfile import label
+from lib2to3.pytree import convert
 from typing import Callable, List, Any, Tuple, Union
 import torch
 import torch.utils.tensorboard
@@ -7,7 +9,7 @@ import numpy as np
 from .profilers import MyLogger, ProbingProfiler
 from .layers import Loss
 import gc
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, accuracy_score
 
 from .utils import test_ipkernel
 
@@ -37,18 +39,27 @@ class F1Score(CustomMetrics):
         super().__init__(metrics_name, fnct)
     def __call__(self, y_pred: torch.tensor, y_true: torch.tensor, *args: Any, **kwds: Any) -> Union[List, float]:
         assert y_pred.requires_grad == False and y_true.requires_grad == False
-        return self.mfnc(torch.argmax(y_pred.cpu(), dim = -1).numpy(), y_true.cpu().numpy(), average = 'weighted')
+
+        if len(y_pred.shape) >= 2: return self.mfnc(torch.argmax(y_pred.cpu(), dim = -1).numpy(), y_true.cpu().numpy(), average = 'weighted')
+        else: return self.mfnc(y_pred.cpu().numpy(), y_true.cpu().numpy(), average = 'weighted')
     
+class FlattenF1Score(CustomMetrics):
+    def __init__(self, metrics_name: str, fnct: Callable = f1_score):
+        super().__init__(metrics_name, fnct)
+    def __call__(self, y_pred: torch.tensor, y_true: torch.tensor, *args: Any, **kwds: Any) -> Union[List, float]:
+        assert y_pred.requires_grad == False and y_true.requires_grad == False
+        return self.mfnc(y_pred.cpu().numpy(), y_true.cpu().numpy(), average = 'weighted')
+    
+
 class Trainer():
     """This class provides main train and validation functions"""
     def __init__(self, model: torch.nn.Module, logger: MyLogger, profiler: ProbingProfiler, writer: torch.utils.tensorboard.SummaryWriter, 
                        loss_function: Loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler, 
-                       device: torch.device, callback = None, lr: float = 1e-2, processor: Callable = None) -> None:
+                       device: torch.device, callback = None, lr: float = 1e-2, **kwargs) -> None:
 
       """
       Args:
         model, class inherited of nn.Module
-        processor, a processor needed for CTC decoding
         logger, MyLogger: own logger class instance
         profiler, ProbingProfiler: profiler
         writer, torch.utils.tensorboard.SummaryWriter: tensorboard default writer
@@ -60,14 +71,15 @@ class Trainer():
       """
       self.model =  model.to(device)
       self.loss_function = loss_function
-      self.processor = processor
       self.optimizer = optimizer(self.model.parameters(), lr = lr)
-      self.scheduler = scheduler(self.optimizer, T_max = 10)
+      self.scheduler = scheduler(self.optimizer, **kwargs) if scheduler else\
+                       torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience = 2)
       self.callback = callback
       self.logger = logger
       self.device = device
       self.writer = writer
       self.profiler = profiler
+
 
     def train_on_batch(self, x_batch, labels, prof: ProbingProfiler) -> float:
         """
@@ -82,12 +94,36 @@ class Trainer():
         
         self.optimizer.zero_grad()
         output = self.model(*x_batch if isinstance(x_batch, tuple) else x_batch)
-
-        loss = self.loss_function(labels, output, self.model.clf)
+        loss = self.loss_function(labels.long(), output,  self.model.clf)
+    
         loss.backward()
-
         self.optimizer.step()
         prof.step()
+        return loss.cpu().item()
+
+    def train_on_batch_ctc(self, x_batch, labels, prof: ProbingProfiler) -> float:
+        """
+        This function needs to be implemented for 
+        any particular model;
+        Args:
+            x_batch, labels: batches of data and target
+            prof, ProbingProfiler instance 
+        Output: loss: int, value of loss_fn on the batch of data
+        """
+        _ = self.model.train()
+        
+        self.optimizer.zero_grad()
+        output = self.model(*x_batch if isinstance(x_batch, tuple) else x_batch)
+        input_lengths = torch.full(size=(labels.size(0),), fill_value=output.size(1), dtype=torch.long)
+        target_lengths = torch.sum(labels >= 0, -1)
+        loss = self.loss_function(labels.masked_select(labels >= 0), output, self.model.clf, 
+                                  input_lengths = input_lengths, target_lengths = target_lengths)
+        loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm = 666)
+        self.optimizer.step()
+        prof.step()
+        
         return loss.cpu().item()
 
     def _clear_cache(self):
@@ -95,7 +131,7 @@ class Trainer():
             with torch.no_grad(): torch.cuda.empty_cache()
             gc.collect()
 
-    def train_epoch(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler) -> float:
+    def train_epoch(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, use_ctc: bool) -> float:
         """Args:
             train_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
@@ -105,16 +141,19 @@ class Trainer():
         train_loss = []
         for it, batch in tqdm(enumerate(train_loader), total = len(train_loader)):
             inputs, attention_masks, labels = batch_processing_fn(batch)
-            batch_loss = self.train_on_batch((inputs, attention_masks), labels, prof)
+            batch_loss = self.train_on_batch_ctc((inputs, attention_masks), labels, prof) if use_ctc else\
+                         self.train_on_batch((inputs, attention_masks), labels, prof)       
 
             if self.callback is not None:
                 with torch.no_grad(): self.callback(self.model, batch_loss)              
             train_loss.append(batch_loss)
+            self.scheduler.step(batch_loss) 
+
 
         return np.mean(train_loss)
 
     @torch.no_grad()
-    def valid_epoch(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, metrics: callable, output_convert_fn: Callable = None, **kwagrs) -> Tuple:
+    def valid_epoch(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, metrics: callable) -> Tuple:
         """Args:
             valid_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
@@ -138,7 +177,7 @@ class Trainer():
         return np.mean(valid_loss), np.mean(valid_metrics)
 
     @torch.no_grad()
-    def valid_epoch_ctc(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, output_convert_fn: Callable, prof: ProbingProfiler, metrics: callable, **kwagrs) -> Tuple:
+    def valid_epoch_ctc(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, metrics: callable, **kwagrs) -> Tuple:
         """Args:
             valid_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
@@ -154,19 +193,22 @@ class Trainer():
         for it, batch in tqdm(enumerate(valid_loader), total = len(valid_loader)):
             inputs, attention_masks, labels = batch_processing_fn(batch)
             output = self.model(inputs, attention_masks)
-                        
-            predicted_promt = output_convert_fn(torch.argmax(output.detach().cpu(), dim = -1), **kwagrs)
-            labels = output_convert_fn(labels.detach().cpu(), **kwagrs)
 
-            batch_loss = self.loss_function(labels, predicted_promt, self.model.clf)
+            input_lengths = torch.full(size=(labels.size(0),), fill_value=output.size(1), dtype=torch.long)
+            target_lengths = torch.sum(labels >= 0, -1)
+            batch_loss = self.loss_function(labels.masked_select(labels >= 0), output, self.model.clf, 
+                                  input_lengths = input_lengths, target_lengths = target_lengths)
             valid_loss.append(batch_loss.detach().cpu().item())
-            valid_metrics.append(metrics(predicted_promt, labels))
-            prof.step()
             
+
+            cl_dim = output.size(-1)
+            valid_metrics.append(metrics(output.detach().cpu().reshape(-1, cl_dim), torch.where(labels >= 0, labels, 0).detach().cpu().reshape(-1)))
+            
+            prof.step()
         return np.mean(valid_loss), np.mean(valid_metrics)
     
 
-    def train(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, count_of_epoch: int, info: dict, **kwagrs):
+    def train(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, count_of_epoch: int, info: dict):
         """
         Trainer of the model;  uses `train_epoch` method
         Args:
@@ -184,17 +226,16 @@ class Trainer():
         with self.profiler.profile('train') as prof:
             for it in iterations:
                 self.logger.log_string(f"{it} out of {count_of_epoch}")
-                epoch_loss = self.train_epoch(train_loader = train_loader, batch_processing_fn = batch_processing_fn, prof = prof)
+                epoch_loss = self.train_epoch(train_loader = train_loader, batch_processing_fn = batch_processing_fn, prof = prof, use_ctc = info['ctc'])
                 
                 self.writer.add_scalar("training loss of layer {}".format(info["layer"]), epoch_loss, it * len(train_loader))
-                self.scheduler.step() 
                 iterations.set_postfix({'train epoch loss': epoch_loss})
                 self._clear_cache()
         return self
 
 
     @torch.no_grad()
-    def validate(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, metrics: Callable, info: dict, output_convert_fn: Callable = None, **kwagrs) -> Tuple:
+    def validate(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, metrics: Callable, info: dict, **kwagrs) -> Tuple:
         """Args:
             valid_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
@@ -209,7 +250,8 @@ class Trainer():
         self.model.eval()
         self.logger.log_string(f"validating...")
         with self.profiler.profile('validation') as prof:
-            valid_loss, valid_metrics = self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics, output_convert_fn = output_convert_fn, **kwagrs)
+            valid_loss, valid_metrics = self.valid_epoch_ctc(valid_loader, batch_processing_fn, prof = prof, metrics = metrics, **kwagrs) if info['ctc'] else\
+                                        self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics)
             self.writer.add_scalar("valid loss", valid_loss, info['layer'])
             self.writer.add_scalar(f"valid {metrics.name}", valid_metrics, info['layer'])
 

@@ -6,7 +6,7 @@ import torch
 
 from torch.utils import tensorboard
 from ..base.constants import Constants
-from ..func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2, prepare_probing_task_
+from ..func_utils import prepare_probing_task, prepare_probing_task_timit, prepare_probing_task_timit_2, prepare_probing_task_, ipa_processing_timit
 from ..base.utils import _lang, _make_directory_structure, DatasetSplit, f_set
 from ..base.processing import Processor
 from ..phoneme_utils import ASRDatasetProcessor, comparison_dict
@@ -16,7 +16,7 @@ from ..clf import ProberModel
 from ..probers import Prober, Wav2Vec2Prober
 from ..pipeline import Probing_pipeline
 from IPython.display import clear_output
-from ..tokenizers import Wav2Vec2OProcessor
+from ..tokenizers import Wav2Vec2OProcessor, Wav2Vec2PProcessor
 
 
 class SimpleASRPipeline(TaskTester):
@@ -44,6 +44,7 @@ class SimpleASRPipeline(TaskTester):
                         poisoning_ratio: float = 0,
                         poisoning_mapping = None,
                         from_disk: bool = False,
+                        use_ctc_objectve: bool = True,
                         **kwargs) -> dict:
         self.results = []
         layers = list(sorted(layers))   
@@ -68,22 +69,23 @@ class SimpleASRPipeline(TaskTester):
                     pipe.load_data(from_disk = from_disk, data_path = (morph_call if dataset_name is None else dataset_name) if not from_disk else data_path, revision = cc.MODELS_PATH[morph_call][str(lang)][-1])
                     data_proc = ASRDatasetProcessor(dataset_type=morph_call, model_path=model_path, 
                                                     feature_column=feature, tokenizer=tokenizer, dataset=pipe.dataset,
-                                                    f_set = own_feature_set, only_custom_features = False)
+                                                    f_set = own_feature_set, only_custom_features = False, for_ctc = use_ctc_objectve)
                     
-                    pipe.dataset = data_proc.process_dataset(preprocessing_fn=preprocessing_fn)
-                    print(set(pipe.dataset['label']))
-                    print(set(data_proc.f_set.values()))
-
+                   
+                    pipe.dataset = data_proc.process_dataset(preprocessing_fn=preprocessing_fn,
+                                                            target_processing = {'fn': ipa_processing_timit, 'kwargs':  {"target_vocab": own_feature_set}} if use_ctc_objectve else None,
+                                                            _save_to_disk = False)
                     print("The task title:", title)
                     res = pipe.run_probing(model2probe, probing_fn, layers = layers, enable_grads = enable_grads, 
                                 use_variational = use_mdl, 
                                 checkpoint = checkpoint,
                                 save_checkpoints = save_checkpoints, 
-                                init_strategy = init_strategy, 
+                                init_strategy = init_strategy, use_ctc_objective = use_ctc_objectve,
+                                model_vocab = len(data_proc.tokenizer.tokenizer.tokenizer.get_vocab()),
                                 plotting_config = {"title": title,
                                                     "metrics": ['f1'], 'save_path': os.path.join(cc.GRAPHS_PATH, str(cc.TODAY))},
-                                          poisoning_ratio = poisoning_ratio,
-                                          poisoning_mapping = poisoning_mapping)
+                                poisoning_ratio = poisoning_ratio,
+                                poisoning_mapping = poisoning_mapping)
                     pipe.cleanup()
                     self.results.append(res)
         if not cc.DEBUG: clear_output(wait = True) 

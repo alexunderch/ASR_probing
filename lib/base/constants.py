@@ -3,8 +3,8 @@ import os
 class Constants:
     TODAY = str(datetime.now().strftime('%Y-%m-%d')) 
     POOLING_TO = 4
-    BATCH_SIZE = 45
-    N_EPOCHS = 10
+    BATCH_SIZE = 30
+    N_EPOCHS = 15
     MAX_LEN = 13000 #for linguistic dataset
     DEBUG = False 
     PROFILING = False 
@@ -13,11 +13,11 @@ class Constants:
                                 "fr": ["facebook/wav2vec2-large-xlsr-53-french", "1.10.0"],
                                 "de": ["facebook/wav2vec2-largee-xlsr-53-german", "1.10.0"],
                                 "es": ["facebook/wav2vec2-large-xlsr-53-spanish", "1.10.0"]},
-                "timit_asr": {"None": ["elgeish/wav2vec2-large-lv60-timit-asr", "1.10.0"]},
+                "timit_asr": {"None": ["elgeish/wav2vec2-large-lv60-timit-asr", None],
+                              "ipa": ["facebook/wav2vec2-xlsr-53-espeak-cv-ft", None]},
                 "bert": {"None": "bert-large-cased"},
                 "t5": {"None": "t5-small"},
                 "roberta": {"None": "roberta-large-cased"},
-                "wav2vec2phonemes": {"None": "facebook/wav2vec2-xlsr-53-espeak-cv-ft"}
                 }
 
     TIMIT_METADATA_PATH = os.path.join(os.path.curdir, 'timit_features_proc.csv')

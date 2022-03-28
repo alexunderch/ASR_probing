@@ -12,17 +12,34 @@ class KL:
 
 
 class Loss:
-    def __init__(self, variational: bool = True, ctc = False):
+    def __init__(self, variational: bool = True, ctc = False, blank_token: int = 0):
         self.variational = variational
-        self.ctc = ctc
-    def __call__(self, y_true, y_pred, model = None):
-        base_loss = torch.nn.CTCLoss() if self.ctc else torch.nn.CrossEntropyLoss()
+        self.ctc = ctc  
+        self.blank = blank_token
+    def __call__(self, y_true, y_pred, model = None, **kwargs):
+        if self.ctc: 
+            base_loss = torch.nn.CTCLoss(blank=self.blank, zero_infinity=True, reduction = "mean")
+            reconstruction_error = base_loss(y_pred.permute(1, 0, 2), y_true, **kwargs)
+        else: reconstruction_error = torch.nn.CrossEntropyLoss()(y_pred, y_true)
         if self.variational:
-            reconstruction_error = base_loss(y_pred, y_true)
-            kl = model.accumulated_kl_div
+            kl = model.accumulated_kl_div 
             model.reset_kl_div()
             return reconstruction_error + kl
-        else: return base_loss(y_pred, y_true)
+        else: return reconstruction_error
+
+class CTCLikeLoss(Loss): #inproject
+    def __init__(self, variational: bool = True, blank_token: int = 0):
+        super().__init__(variational, True, blank_token)
+    def __call__(self, y_true, y_pred, y_true_L, y_pred_L, model=None, **kwargs):
+        ctc_error =  super().__call__(y_true, y_pred, model, **kwargs)
+        reconstruction_error = torch.nn.CrossEntropyLoss()(y_pred_L, y_true_L)
+        if self.variational:
+            kl = model.accumulated_kl_div
+            model.reset_kl_div()
+            return 0.5 * (reconstruction_error + ctc_error) + kl
+        else: 0.5 * (reconstruction_error + ctc_error)
+
+
 
 class LinearVariational(torch.nn.Module):
     def __init__(self, in_features: int, out_features: int, parent, bias: bool=True, device: torch.device = torch.device('cpu')) -> None:
@@ -79,33 +96,5 @@ class LinearModel(torch.nn.Module):
         self.kl_loss.accumulated_kl_div = 0
             
     def forward(self, x):
+        # for l in self.layers.modules(): print(list(l.parameters()))
         return self.layers(x)
-
-class ProberModel(torch.nn.Module):
-    def __init__(self, parent_model, clf, enable_grads: bool, encoder_decoder: bool = False):
-        super().__init__()
-        cc = Constants
-        self.parent_model = parent_model
-        self.pooling_layer = torch.nn.AdaptiveAvgPool1d(output_size = cc.POOLING_TO)
-        self.clf = clf
-        self.enable_grads = enable_grads
-        self.encoder_decoder = encoder_decoder
-    def forward(self, inp, att):
-        if hasattr(self.parent_model, "decoder"): 
-              parent_out = lambda e_inp, e_att: self.parent_model(e_inp, attention_mask = e_att, decoder_input_ids = e_inp,
-                                                                  output_hidden_states = True if self.encoder_decoder else False, output_attentions = False)  
-        else: parent_out = lambda e_inp, e_att: self.parent_model(e_inp, attention_mask = e_att,
-                                                                  output_hidden_states = False, output_attentions = False)
-                                                        
-        if self.enable_grads: out = parent_out(inp, att)
-        else: 
-            with torch.no_grad(): out = parent_out(inp, att)
-        if not self.encoder_decoder:
-            if hasattr(self.parent_model, "decoder"):  out = out.encoder_last_hidden_state
-            else: out = out.last_hidden_state
-        else: out = out.decoder_hidden_states[-1]
-
-
-        out = self.pooling_layer(out.transpose(1, 2)).transpose(1, 2)
-        out = self.clf(out.reshape(out.size(0), -1))
-        return out

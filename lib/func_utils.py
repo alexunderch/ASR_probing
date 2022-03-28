@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from  IPython.display import clear_output
-
+from .phoneme_utils import _timit2ipa
 from .base.constants import Constants
 from sklearn.linear_model import SGDClassifier, LogisticRegression
 from sklearn.model_selection import train_test_split
@@ -44,13 +44,23 @@ def prepare_probing_task_(batch, feature_column: str):
 
 
 ##timit
-def prepare_probing_task_timit(batch, feature_column: str):
+def prepare_probing_task_timit_fast(batch, feature_column: str):
     frame_offset, num_frames = 16000, 16000
     sp, sr = load(batch["file"], frame_offset = frame_offset, num_frames = num_frames)
     resampler = transforms.Resample(sr, 16000)
     batch['speech'] = resampler(sp).squeeze().numpy()
     batch["sampling_rate"] = 16000
     batch['len_speech'] = len(batch['speech'])
+
+    return batch
+
+def prepare_probing_task_timit(batch, feature_column: str):
+    sp, sr = load(batch["file"])
+    resampler = transforms.Resample(sr, 16000)
+    batch['speech'] = resampler(sp).squeeze().numpy()
+    batch["sampling_rate"] = 16000
+    batch['len_speech'] = len(batch['speech'])
+
     return batch
 
 metadata = pd.read_csv(cc.TIMIT_METADATA_PATH)
@@ -69,15 +79,18 @@ def prepare_probing_task_timit_2(batch, feature_column: str):
 
 import re
 
-def remove_special_characters_and_preprocess(batch, preprocessor: Wav2Vec2Processor, max_len: int = 100):
-    chars_to_ignore_regex = '[\,\?\.\!\-\;\:\"]'
-    batch["text"] = re.sub(chars_to_ignore_regex, '', batch["text"]).lower()
+def remove_special_characters(batch, text_column: str = "text"):
+    chars_to_ignore_regex = '[\s\,\?\.\!\-\;\:\"]'
+    tmp = re.sub(chars_to_ignore_regex, '', batch[text_column]).lower()
+    all_symbols = []
+    for word in tmp: all_symbols.extend(list(word))
+    batch["len_text"] = len(all_symbols)
+    batch[text_column] = " ".join(all_symbols)
+    return batch
 
-    with preprocessor.as_target_processor():
-        label_batch = preprocessor.pad(batch['text'],
-                                       padding = "max_length",
-                                       max_length = max_len,
-                                       return_tensors = "pt")
-    batch['label'] = label_batch["input_ids"]
-
+def ipa_processing_timit(batch, target_vocab: dict, text_column: str = 'text'):
+    tmp = batch['phonetic_detail']['utterance']
+    batch["len_text"] = len(tmp)
+    totv = lambda x: str(target_vocab[x]) if x in list(target_vocab.keys()) else "<unk>"
+    batch[text_column] = "".join([(totv(_timit2ipa[l.upper()]) if l.upper() in list(_timit2ipa.keys()) else l )for l in tmp])
     return batch

@@ -59,24 +59,25 @@ from copy import deepcopy
 
 #TODO: fix docs
 
-def comparison_dict(feature_lists: List[List], only_custom_features: bool = False):
+def comparison_dict(feature_lists: List[List], only_custom_features: bool = False, other_tok: str ="h#"):
     """Create a dict to compare two feature lists"""
     count = 0
     d = {d1_el: count for d1_el in feature_lists[0]}
     for dl in feature_lists[1:]:
         count += 1 
         d.update({d2_el: count for d2_el in dl})
-    if only_custom_features: d.update({"other": count + 1})
+    if only_custom_features: d.update({other_tok: count + 1})
     return d    
 
 class ASRDatasetProcessor(DatasetProcessor):
     """Dataset wrapper for Huggingface ASR datasets"""
     def __init__(self, dataset_type: str, model_path: Union[str, Dict], feature_column: str, tokenizer: Optional[Callable] = None,
-                 dataset: Dataset = None, f_set: dict = None, only_custom_features: bool = False) -> None:
+                 dataset: Dataset = None, f_set: dict = None, only_custom_features: bool = False, for_ctc: bool = False) -> None:
         super().__init__(dataset_type, model_path, filepath = os.curdir, dataset_name = dataset_type, 
                         feature_column = feature_column, tokenizer = tokenizer, f_set = f_set, 
                         only_custom_features = only_custom_features)
         self.task_data = dataset
+        self.for_ctc = for_ctc
 
     def get_data(self):
         """A method to define `self.dataset` which doesnt come from pipeline. Override it."""
@@ -126,17 +127,32 @@ class ASRDatasetProcessor(DatasetProcessor):
 
         print_if_debug('reading files...', self.cc.DEBUG)
         if preprocessing_fn is not None:
+            print_if_debug('processing features...', self.cc.DEBUG)
+
             self.task_data = self.task_data.map(preprocessing_fn, fn_kwargs = {'feature_column': self.feature_column}, disable_nullable = False)
             self.task_data = self.task_data.filter(lambda example: len(example["speech"]) > 0)
 
-        print_if_debug('encoding features...', self.cc.DEBUG)
-        self._filter_data(self.tok2label, self.only_custom_features)
-        self.task_data = self.task_data.map(encode_labels, fn_kwargs = {'feature_column': self.feature_column})
-        print_if_debug('processing features...', self.cc.DEBUG)
+        if not self.for_ctc:
+            print_if_debug('encoding features...', self.cc.DEBUG)
+            self._filter_data(self.tok2label, self.only_custom_features)
+            self.task_data = self.task_data.map(encode_labels, fn_kwargs = {'feature_column': self.feature_column})
+        else: self.f_set = self.tok2label
 
-        # return None
-        self.task_data = self.task_data.map(self.tokenizer, fn_kwargs = {'data_column': 'speech', "feature_column": self.feature_column,
-                                                                                'max_len': np.max(self.task_data['len_speech'])})
+        if target_processing is not None:   
+            print_if_debug('target processing... (is ON)', self.cc.DEBUG)
+            assert isinstance(target_processing, dict)
+            assert ['fn', 'kwargs'] == list(target_processing.keys()) 
+            assert isinstance(target_processing['fn'], Callable) and\
+                   isinstance(target_processing['kwargs'], dict)
+
+            self.task_data = self.task_data.map(target_processing['fn'], fn_kwargs = target_processing['kwargs'])
+
+        tok_kwargs  = {'data_column': 'speech', "feature_column": self.feature_column, 'max_len': np.max(self.task_data['len_speech'])}
+        if self.for_ctc: 
+            tok_kwargs.update({'labels_max_len': np.max(self.task_data['len_text'])}) 
+            self.tokenizer.update_vocab(self.f_set)
+
+        self.task_data = self.task_data.map(self.tokenizer, fn_kwargs = tok_kwargs)
 
         if drop_columns is not None:
             print_if_debug('removing user-picked columns...', self.cc.DEBUG)
@@ -145,17 +161,10 @@ class ASRDatasetProcessor(DatasetProcessor):
             elif isinstance(drop_columns, list): self.task_data = self.task_data.remove_columns(drop_columns)
         self.task_data = self.task_data.remove_columns(['speech', 'len_speech', 'sampling_rate'] + ([self.feature_column] if self.feature_column != "label" else []))
 
-        if target_processing is not None:
-            print_if_debug('target processing... (is ON)', self.cc.DEBUG)
-            assert isinstance(target_processing, dict)
-            assert ['fn', 'kwargs'] == list(target_processing.keys()) 
-            assert isinstance(target_processing['fn'], Callable) and\
-                   isinstance(target_processing['kwargs'], dict)
+        
+        self.task_data.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
 
-            self.task_data = self.task_data.map(target_processing['fn'], fn_kwargs = target_processing['kwargs'])
-            self.task_data.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
-
-            if _save_to_disk: self.task_data.save_to_disk(self.dname)
+        if _save_to_disk: self.task_data.save_to_disk(self.dname)
         return self.task_data
 
 
@@ -260,19 +269,15 @@ _timit2ipa.update({
     'UX':'ʉ',
 })
 
-def convert_labels2ipa(labels: torch.Tensor, vocab: dict, target_vocab: dict = None):
-    """Converting labels to target vocab labels if needed"""
-    _array = list()
-    for _arr_el in labels.numpy():
-        l  = vocab[_arr_el]
-        _array.append(target_vocab[l] if target_vocab else l)
-    return torch.from_numpy(np.array(_array))
-
-
-
 def convert_timit2ipa(batch):
     batch["ipa"] = _timit2ipa[batch["utterance"].upper()]
     return batch
+
+def convert_labels(labels: List, target_vocab: dict) -> torch.tensor:
+    """Converting labels to target vocab labels if needed"""    
+    return torch.tensor(np.array(list([_timit2ipa[target_vocab[letter]] if letter in list(_timit2ipa.keys()) else target_vocab["other"]\
+                for letter in labels[0].split()])))
+
 
 def convert():
     from datasets import load_from_disk
