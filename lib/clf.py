@@ -7,7 +7,7 @@ class ProberModel(torch.nn.Module):
         super().__init__()
         cc = Constants
         self.parent_model = parent_model
-        
+        self.pooling_layer = torch.nn.AdaptiveAvgPool1d(output_size = cc.POOLING_TO)
         self.clf = clf
         self.enable_grads = enable_grads
         self.encoder_decoder = encoder_decoder
