@@ -44,7 +44,7 @@ class SimpleASRPipeline(TaskTester):
                         poisoning_ratio: float = 0,
                         poisoning_mapping = None,
                         from_disk: bool = False,
-                        use_ctc_objectve: bool = True,
+                        use_ctc_objectve: bool = False,
                         **kwargs) -> dict:
         self.results = []
         layers = list(sorted(layers))   

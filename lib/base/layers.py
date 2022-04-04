@@ -11,6 +11,7 @@ class KL:
     accumulated_kl_div = 0
 
 
+
 class Loss:
     def __init__(self, variational: bool = True, ctc = False, blank_token: int = 0):
         self.variational = variational
@@ -39,7 +40,16 @@ class CTCLikeLoss(Loss): #inproject
             return 0.5 * (reconstruction_error + ctc_error) + kl
         else: 0.5 * (reconstruction_error + ctc_error)
 
+class DummyOutput(object):
+    def __init__(self, x) -> None:
+        self.last_hidden_state = x
+        self.encoder_last_hidden_state =x
 
+class DummyLayer(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, x, *args, **kwargs):
+        return DummyOutput(x)
 
 class LinearVariational(torch.nn.Module):
     def __init__(self, in_features: int, out_features: int, parent, bias: bool=True, device: torch.device = torch.device('cpu')) -> None:

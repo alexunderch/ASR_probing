@@ -6,7 +6,7 @@ from datasets import Dataset
 from .base.utils import print_if_debug
 from .base.constants import Constants
 from .base.trainer import Trainer, F1Score
-from .base.layers import LinearModel, Loss, CTCLikeLoss
+from .base.layers import LinearModel, Loss, DummyLayer
 
 from .base.prober import Prober
 import os
@@ -75,7 +75,7 @@ class BertOProber(Prober):
             tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
                          loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
             print_if_debug("training...", self.cc.DEBUG)
-            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer, 'ctc': False, 'attention_masks': True})
             
 
             if save_outputs:
@@ -86,7 +86,7 @@ class BertOProber(Prober):
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer, 'ctc': False, 'attention_masks': True})            
             probing_info['loss'].append(valid_loss)
             probing_info['metrics'].append(valid_metrics) 
             
@@ -283,7 +283,7 @@ class T5EncoderProber(Prober):
             tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
                     loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
             print_if_debug("training...", self.cc.DEBUG)
-            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer, 'ctc': False, 'attention_masks': True})
             
 
             if save_outputs:
@@ -294,7 +294,7 @@ class T5EncoderProber(Prober):
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer, 'ctc': False, 'attention_masks': True})            
             probing_info['loss'].append(valid_loss)
             probing_info['metrics'].append(valid_metrics)   
 
@@ -381,7 +381,7 @@ class T5EncoderDecoderProber(Prober):
             tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
                     loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
             print_if_debug("training...", self.cc.DEBUG)
-            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer})
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": layer, 'ctc': False, 'attention_masks': True})
 
             if save_outputs:
                 chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
@@ -391,7 +391,7 @@ class T5EncoderDecoderProber(Prober):
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer})            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": layer, 'ctc': False, 'attention_masks': True})            
 
             probing_model = probing_model.cpu()
             del probing_model
@@ -414,53 +414,53 @@ class T5EncoderDecoderProber(Prober):
 
 ###########MAINTENANCE
 class StackedEmbeddingsProber(Prober):
-    def __init__(self, embeddings: List[torch.TensorType], writer: torch.utils.tensorboard.SummaryWriter, device: torch.device = torch.device('cpu'), init_strategy: str = None) -> None:
-        super().__init__(model_type = None, model_path = None, writer = writer, data = None, device = device, init_strategy = init_strategy)
-        self.stack = embeddings
+    def __init__(self, model_path: str, writer: torch.utils.tensorboard.SummaryWriter, device: torch.device = torch.device('cpu'), init_strategy: str = None, data: Dataset = None) -> None:
+        super().__init__(model_type = None, model_path = None, writer = writer, data = data, device = device, init_strategy = init_strategy)
+        self.stack = deepcopy(data['input_values'])
         if init_strategy is not None:
             print_if_debug("reseting network parameters...", self.cc.DEBUG)
             assert isinstance(init_strategy, str)
-            if init_strategy == "full": self.stack = [torch.normal(mean = 0.0, std = 1., size = s.size()) for s in embeddings]
+            if init_strategy == "full": self.stack = [torch.normal(mean = 0.0, std = 1., size = s.size()) for s in self.stack ]
             else: print("No init with {} strategy".format(init_strategy))
         self.writer = writer
-        self.data = None
+        self.data = data
         self.device = device
 
-    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, save_outputs: bool = False, task_title: dict = None) -> dict:
+    def make_probe(self, prober: torch.nn.Module, enable_grads: bool = False, use_variational: bool = False, layers: list = [], save_outputs: bool = False, task_title: dict = None) -> dict:
 
         def _prepare_data(batch):
             """Helper function
             """
             labels = batch['label'].to(self.device)
-            inp_values = batch['input_values'].to(self.device)
+            inp_values = batch['input_values'].unsqueeze(-1).transpose(1,2).to(self.device)
             return inp_values, labels
 
         print_if_debug("stacking classifiers...", self.cc.DEBUG)
+        inputs, _ = _prepare_data(iter(self.dataloader).next())
 
         loss_fn = Loss(use_variational)
-
+        self.cc.POOLING_TO = 1
         probing_info = {'loss': [], 'metrics': []}
-
-        model_config = {'in_size': self.stack[0].size(-1), 
+        model_config = {'in_size': inputs.size(-1), 
                         'hidden_size': 100,
-                        'out_size': len(torch.unique(self.data['label'])),
+                        'out_size': len(torch.unique(torch.tensor(self.data['label']))),
                         'variational': use_variational,
                         'device': self.device}
 
         for ind, _ in enumerate(self.stack):
             self.logger.log_string(f"emb {ind} of {len(self.stack)} in process")     
 
-            probing_model = prober(parent_model = torch.nn.Identity(self.stack[0].size(-1)),
+            probing_model = prober(parent_model = DummyLayer(),
                         clf = LinearModel(**model_config),
                         enable_grads = enable_grads,
                         ).to(self.device)
             probing_model.eval()
             tr = Trainer(model = probing_model.to(self.device), logger = self.logger, profiler = self.profiler, writer = self.writer,
-                         loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = torch.optim.lr_scheduler.CosineAnnealingLR, device = self.device, lr = 3. * 1e-3)
+                         loss_function = loss_fn, optimizer = torch.optim.Adam, scheduler = None, device = self.device, lr = 3. * 1e-3)
             print_if_debug("training...", self.cc.DEBUG)
-            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, info = {"layer": ind})
+            _ = tr.train(train_loader = self.dataloader, batch_processing_fn = _prepare_data, count_of_epoch = self.cc.N_EPOCHS, 
+                        info = {"layer": ind, 'ctc': False, 'attention_masks': False})
             
-
             if save_outputs:
                 chkpnt = self.checkpointer(probing_model = probing_model.cpu(),
                                             task_title = "" if task_title is None else task_title['title'],
@@ -469,7 +469,8 @@ class StackedEmbeddingsProber(Prober):
             
             self._clear_cache()
             print_if_debug("validating...", self.cc.DEBUG)
-            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), info = {"layer": ind})            
+            valid_loss, valid_metrics = tr.validate(valid_loader = self.validloader, batch_processing_fn = _prepare_data, metrics = F1Score(task_title["metrics"]), 
+                                                    info = {"layer": ind, 'ctc': False, 'attention_masks': False})            
             probing_info['loss'].append(valid_loss)
             probing_info['metrics'].append(valid_metrics) 
             

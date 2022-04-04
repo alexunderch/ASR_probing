@@ -27,7 +27,6 @@ class ProberModel(torch.nn.Module):
             else: out = out.last_hidden_state
         else: out = out.decoder_hidden_states[-1]
         out = self.pooling_layer(out.transpose(1, 2)).transpose(1, 2)
-
         if not self.use_ctc: 
             out = self.clf(out.reshape(out.size(0), -1))
             return out

@@ -1,7 +1,7 @@
 from typing import Any
 class TaskTester(object):
     """A class to make probing"""
-    def __init__(self) -> None: 
+    def __init__(self) -> list: 
         """grouping args according to argparser methodology"""
         self.auxillary_args = dict()
         self.model_args = dict()

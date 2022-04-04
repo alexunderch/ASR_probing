@@ -3,6 +3,7 @@ from .base.constants import Constants
 from transformers import BertTokenizer, Wav2Vec2Processor, T5Tokenizer, Wav2Vec2FeatureExtractor, Wav2Vec2CTCTokenizer
 from .base.processing import Processor
 import json
+import torch
 from .base.utils import print_if_debug
 
 
@@ -45,7 +46,6 @@ class Wav2Vec2PProcessor(Processor):
         """Updating vocab with new tokens for CTC probing encoding"""
         self.encoding_vocab = v
         self.vocab.update(v)
-        # self.tokenizer.tokenizer.add_tokens(list(set(self.vocab.keys())))
         self.tokenizer.tokenizer.add_tokens(list(set(self.vocab.values())))
 
         print_if_debug(str(self.tokenizer.tokenizer.get_vocab()), self.cc.DEBUG)
@@ -76,4 +76,15 @@ class T5Processor(Processor):
                                     max_length = max_len, truncation = True, padding = 'max_length')
         batch['input_values'] = inputs.input_ids
         batch['attention_mask'] = inputs.attention_mask
+        return batch
+
+class EmbeddingProcessor(Processor):
+    def __init__(self, model_path: str = None) -> None: pass
+    def __call__(self, batch, data_column: str = "data"):
+        """Preprocessing input embedding to the unified form: [batch_size, feature_dim]"""
+        embedding = torch.FloatTensor(batch[data_column])
+        batch["input_values"] = embedding
+        # else: raise ValueError("Operation is only supported for these shapes:\
+        #                       [bs, seq_len, f], [bs, f], [f]")
+        
         return batch

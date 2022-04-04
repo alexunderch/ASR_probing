@@ -100,9 +100,7 @@ class Prober:
                                                                                     'ratio': poisoning_ratio,
                                                                                      'mapping': poisoning_mapping})
 
-            
-        self.data.set_format(type = 'torch', columns = ['input_values', 'attention_mask', 'label'])
-
+    
         splitted_dataset = self.data.train_test_split(test_size = 0.25, seed = 42)
         if not self.use_ctc:    
             weights = 1. / np.bincount(splitted_dataset['train']['label'])

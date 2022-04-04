@@ -93,7 +93,7 @@ class Trainer():
         _ = self.model.train()
         
         self.optimizer.zero_grad()
-        output = self.model(*x_batch if isinstance(x_batch, tuple) else x_batch)
+        output = self.model(*x_batch if isinstance(x_batch, tuple) else (x_batch, None))
         loss = self.loss_function(labels.long(), output,  self.model.clf)
     
         loss.backward()
@@ -131,7 +131,7 @@ class Trainer():
             with torch.no_grad(): torch.cuda.empty_cache()
             gc.collect()
 
-    def train_epoch(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, use_ctc: bool) -> float:
+    def train_epoch(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, ctc: bool, attention_masks: bool =True) -> float:
         """Args:
             train_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
@@ -140,10 +140,13 @@ class Trainer():
         """
         train_loss = []
         for it, batch in tqdm(enumerate(train_loader), total = len(train_loader)):
-            inputs, attention_masks, labels = batch_processing_fn(batch)
-            batch_loss = self.train_on_batch_ctc((inputs, attention_masks), labels, prof) if use_ctc else\
-                         self.train_on_batch((inputs, attention_masks), labels, prof)       
-
+            if attention_masks:
+                inputs, attention_masks, labels = batch_processing_fn(batch)
+                batch_loss = self.train_on_batch_ctc((inputs, attention_masks), labels, prof) if ctc else\
+                            self.train_on_batch((inputs, attention_masks), labels, prof)       
+            else:
+                inputs, labels = batch_processing_fn(batch)
+                batch_loss = self.train_on_batch(inputs, labels, prof)       
             if self.callback is not None:
                 with torch.no_grad(): self.callback(self.model, batch_loss)              
             train_loss.append(batch_loss)
@@ -226,7 +229,8 @@ class Trainer():
         with self.profiler.profile('train') as prof:
             for it in iterations:
                 self.logger.log_string(f"{it} out of {count_of_epoch}")
-                epoch_loss = self.train_epoch(train_loader = train_loader, batch_processing_fn = batch_processing_fn, prof = prof, use_ctc = info['ctc'])
+                epoch_loss = self.train_epoch(train_loader = train_loader, batch_processing_fn = batch_processing_fn, prof = prof, 
+                                              ctc = info['ctc'], attention_masks = info['attention_masks'])
                 
                 self.writer.add_scalar("training loss of layer {}".format(info["layer"]), epoch_loss, it * len(train_loader))
                 iterations.set_postfix({'train epoch loss': epoch_loss})
@@ -250,12 +254,36 @@ class Trainer():
         self.model.eval()
         self.logger.log_string(f"validating...")
         with self.profiler.profile('validation') as prof:
-            valid_loss, valid_metrics = self.valid_epoch_ctc(valid_loader, batch_processing_fn, prof = prof, metrics = metrics, **kwagrs) if info['ctc'] else\
-                                        self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics)
+            if info["attention_masks"]:
+                valid_loss, valid_metrics = self.valid_epoch_ctc(valid_loader, batch_processing_fn, prof = prof, metrics = metrics, **kwagrs) if info['ctc'] else\
+                                            self.valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics)
+            else: valid_loss, valid_metrics = self._valid_epoch(valid_loader, batch_processing_fn, prof = prof, metrics = metrics)
             self.writer.add_scalar("valid loss", valid_loss, info['layer'])
             self.writer.add_scalar(f"valid {metrics.name}", valid_metrics, info['layer'])
 
         self._clear_cache()
         return valid_loss, valid_metrics
-                        
-
+                
+    @torch.no_grad()
+    def _valid_epoch(self, valid_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, metrics: callable) -> Tuple:
+        """Args: (simple function for embedding probing)
+            valid_loader, torch.utils.data.DataLoader
+            batch_processing_fn, callable: a function for processing each batch
+            prof, ProbingProfiler instance 
+            metrics, callable: own callable metrics
+            output_convert_fn: a Callable output processor for non-auxillary tasks
+        Returns: 
+            valid_loss_per_loader: float, value of loss_fn on the batch of data
+            valid_metrics_per_loader: float, value of metrics_fn on the batch of data
+                """
+        _ = self.model.eval()
+        valid_loss, valid_metrics = [], []
+        for it, batch in tqdm(enumerate(valid_loader), total = len(valid_loader)):
+            inputs, labels = batch_processing_fn(batch)
+            output = self.model(inputs, None)
+            batch_loss = self.loss_function(labels, output, self.model.clf)
+            valid_loss.append(batch_loss.detach().cpu().item())
+            valid_metrics.append(metrics(output.detach().cpu(), labels.detach().cpu()))
+            prof.step()
+            
+        return np.mean(valid_loss), np.mean(valid_metrics)
