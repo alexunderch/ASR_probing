@@ -41,7 +41,8 @@ class BertOProber(Prober):
             """Helper function
             """
             labels = batch['label'].to(self.device)
-            inp_values, att_masks =  batch['input_values'][0].to(self.device), batch['attention_mask'][0].to(self.device)
+            inp_values = torch.stack(batch['input_values'][0], dim=1).to(self.device)
+            att_masks = torch.stack(batch['attention_mask'][0], dim=1).to(self.device)
             return inp_values, att_masks, labels
 
         print_if_debug("stacking classifiers...", self.cc.DEBUG)
@@ -50,11 +51,11 @@ class BertOProber(Prober):
 
         probing_info = {'loss': [], 'metrics': []}
 
-        inputs, attention_masks, _ = _prepare_data(iter(self.dataloader).next())
+        inputs, attention_masks, labels = _prepare_data(iter(self.dataloader).next())
 
         model_config = {'in_size': self.model.config.hidden_size * self.cc.POOLING_TO, 
                         'hidden_size': 100,
-                        'out_size': len(torch.unique(self.data['label'])),
+                        'out_size': len(torch.unique(labels)),
                         'variational': use_variational,
                         'device': self.device}
 
