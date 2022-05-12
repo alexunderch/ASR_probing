@@ -131,7 +131,7 @@ class Trainer():
             with torch.no_grad(): torch.cuda.empty_cache()
             gc.collect()
 
-    def train_epoch(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, ctc: bool, attention_masks: bool =True) -> float:
+    def train_epoch(self, train_loader: torch.utils.data.DataLoader, batch_processing_fn: Callable, prof: ProbingProfiler, ctc: bool, attention_mask: bool =True) -> float:
         """Args:
             train_loader, torch.utils.data.DataLoader
             batch_processing_fn, callable: a function for processing each batch
@@ -140,7 +140,7 @@ class Trainer():
         """
         train_loss = []
         for it, batch in tqdm(enumerate(train_loader), total = len(train_loader)):
-            if attention_masks:
+            if attention_mask:
                 inputs, attention_masks, labels = batch_processing_fn(batch)
                 batch_loss = self.train_on_batch_ctc((inputs, attention_masks), labels, prof) if ctc else\
                             self.train_on_batch((inputs, attention_masks), labels, prof)       
@@ -230,7 +230,7 @@ class Trainer():
             for it in iterations:
                 self.logger.log_string(f"{it} out of {count_of_epoch}")
                 epoch_loss = self.train_epoch(train_loader = train_loader, batch_processing_fn = batch_processing_fn, prof = prof, 
-                                              ctc = info['ctc'], attention_masks = info['attention_masks'])
+                                              ctc = info['ctc'], attention_mask = info['attention_masks'])
                 
                 self.writer.add_scalar("training loss of layer {}".format(info["layer"]), epoch_loss, it * len(train_loader))
                 iterations.set_postfix({'train epoch loss': epoch_loss})
